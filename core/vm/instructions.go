@@ -19,10 +19,12 @@ package vm
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm/eni/arg_parser"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -654,6 +656,27 @@ func opDelegateCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, st
 
 	evm.interpreter.intPool.put(to, inOffset, inSize, outOffset, outSize)
 	return ret, nil
+}
+
+func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	// get arguments
+	funcName := string(stack.pop().Bytes()).Trim(string(funcName), "\x00")
+	typeOffset, dataOffset := stack.pop().Int64(), stack.pop().Int64()
+	typeLength := new(big.Int).SetBytes(memory.Get(typeOffset, 32)).Int64()
+	dataLength := new(big.Int).SetBytes(memory.Get(dataOffset, 32)).Int64()
+
+	typeSection := memory.Get(typeOffset+32, typeLength)
+	dataSection := memory.Get(dataOffset+32, dataLength)
+
+	argsText := arg_parser.Parse(typeSection, dataSection)
+
+	retText := evm.eni.ExecuteENI(funcName, argsText)
+
+	// TODO: parse return value
+	retAddr := uint64(7112)
+	memory.Resize(retAddr + uint64(len(retText)))
+	memory.Set(retAddr, 32, []byte(retText))
+	return nil, nil
 }
 
 func opReturn(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
