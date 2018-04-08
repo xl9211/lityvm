@@ -1144,6 +1144,7 @@ func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
 	return nil
 }
 
+
 func (args *SendTxArgs) toTransaction() *types.Transaction {
 	if args.To == nil {
 		return types.NewContractCreation(uint64(*args.Nonce), (*big.Int)(args.Value), (*big.Int)(args.Gas), (*big.Int)(args.GasPrice), args.Data)
@@ -1151,8 +1152,37 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 	return types.NewTransaction(uint64(*args.Nonce), *args.To, (*big.Int)(args.Value), (*big.Int)(args.Gas), (*big.Int)(args.GasPrice), args.Data)
 }
 
+
+// lvyi: issues 34: checkERC20Tx
+func checkERC20Tx(tx *types.Transaction) error{
+
+	if tx.Value().Int64() == 0 && len(tx.Data())==68 {
+
+		getTo := common.GetDataBig(tx.Data(), big.NewInt(5) , big.NewInt(32-1))
+
+		getTo2 := new(big.Int).SetBytes(getTo).Bytes()
+
+		//log.Info(tx.To().Bytes())
+		//log.Info(getTo2)
+
+		if bytes.Compare(tx.To().Bytes(), getTo2)==0{
+			log.Info("ERC20")
+			return errors.New("The ERC20 contract can't receive token!")
+		}
+	}
+	return nil
+}
+
+
 // submitTransaction is a helper function that submits tx to txPool and logs a message.
 func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
+
+	// lvyi issues_34
+	err := checkERC20Tx(tx)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
