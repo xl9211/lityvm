@@ -98,6 +98,8 @@ type EVM struct {
 	// abort is used to abort the EVM calling operations
 	// NOTE: must be set atomically
 	abort int32
+	// functions & dynamic libraries mapping used by ENI
+	eniFunctions map[string]string
 }
 
 // NewEVM retutrns a new EVM evmironment. The returned EVM is not thread safe
@@ -112,6 +114,7 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 	}
 
 	evm.interpreter = NewInterpreter(evm, vmConfig)
+	evm.eniFunctions = GetEniFunctions()
 	return evm
 }
 
