@@ -16,6 +16,22 @@
 
 package vm
 
+/*
+#cgo LDFLAGS: -ldl
+#include <dlfcn.h>
+
+void (*eni_function)();
+
+void set_eni_function(void* f) {
+	eni_function = f;
+}
+
+void call_eni_function() {
+	eni_function();
+}
+*/
+import "C"
+
 import (
 	"math/big"
 	"sync/atomic"
@@ -315,3 +331,25 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
 // Interpreter returns the EVM interpreter
 func (evm *EVM) Interpreter() *Interpreter { return evm.interpreter }
+
+// Execute ENI function
+func (evm *EVM) ExecuteENI(eniFunction string) {
+	// Check If function exists.
+	dynamicLib, ok := evm.eniFunctions[eniFunction]
+	if !ok {
+		panic("function not exists: " + eniFunction)
+	}
+
+	// Load dynamic library.
+	handler := C.dlopen(C.CString(dynamicLib), C.RTLD_LAZY)
+	if handler == nil {
+		panic("dlopen failed: " + dynamicLib)
+	}
+
+	f := C.dlsym(handler, C.CString(eniFunction))
+	if f == nil {
+		panic("dlsym failed: " + eniFunction)
+	}
+	C.set_eni_function(f)
+	C.call_eni_function()
+}
