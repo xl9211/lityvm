@@ -16,28 +16,12 @@
 
 package vm
 
-/*
-#cgo LDFLAGS: -ldl
-#include <dlfcn.h>
-
-void (*eni_function)();
-
-void set_eni_function(void* f) {
-	eni_function = f;
-}
-
-void call_eni_function() {
-	eni_function();
-}
-*/
-import "C"
-
 import (
 	"math/big"
 	"sync/atomic"
-	"github.com/ethereum/go-ethereum/core/vm/eni"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm/eni"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -115,8 +99,9 @@ type EVM struct {
 	// abort is used to abort the EVM calling operations
 	// NOTE: must be set atomically
 	abort int32
-	// functions & dynamic libraries mapping used by ENI
-	eniFunctions map[string]string
+
+	// ethereum native interface handler
+	eni *eni.ENI
 }
 
 // NewEVM retutrns a new EVM evmironment. The returned EVM is not thread safe
@@ -128,10 +113,10 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 		vmConfig:    vmConfig,
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(ctx.BlockNumber),
+		eni:         eni.NewENI(),
 	}
 
 	evm.interpreter = NewInterpreter(evm, vmConfig)
-	evm.eniFunctions = eni.GetEniFunctions()
 	return evm
 }
 
@@ -332,25 +317,3 @@ func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
 
 // Interpreter returns the EVM interpreter
 func (evm *EVM) Interpreter() *Interpreter { return evm.interpreter }
-
-// Execute ENI function
-func (evm *EVM) ExecuteENI(eniFunction string) {
-	// Check If function exists.
-	dynamicLib, ok := evm.eniFunctions[eniFunction]
-	if !ok {
-		panic("function not exists: " + eniFunction)
-	}
-
-	// Load dynamic library.
-	handler := C.dlopen(C.CString(dynamicLib), C.RTLD_LAZY)
-	if handler == nil {
-		panic("dlopen failed: " + dynamicLib)
-	}
-
-	f := C.dlsym(handler, C.CString(eniFunction))
-	if f == nil {
-		panic("dlsym failed: " + eniFunction)
-	}
-	C.set_eni_function(f)
-	C.call_eni_function()
-}
