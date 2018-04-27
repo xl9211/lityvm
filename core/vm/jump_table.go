@@ -877,5 +877,12 @@ func NewFrontierInstructionSet() [256]operation {
 			valid:         true,
 			writes:        true,
 		},
+		ENI: {
+			execute:       opENI,
+			gasCost:       constGasFunc(params.JumpdestGas),
+			validateStack: makeStackFunc(0, 0),
+			valid:         true,
+		},
+
 	}
 }

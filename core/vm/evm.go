@@ -35,6 +35,7 @@ import "C"
 import (
 	"math/big"
 	"sync/atomic"
+	"github.com/ethereum/go-ethereum/core/vm/eni"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -130,7 +131,7 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 	}
 
 	evm.interpreter = NewInterpreter(evm, vmConfig)
-	evm.eniFunctions = GetEniFunctions()
+	evm.eniFunctions = eni.GetEniFunctions()
 	return evm
 }
 

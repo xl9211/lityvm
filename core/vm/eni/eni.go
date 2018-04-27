@@ -1,4 +1,4 @@
-package vm
+package eni
 
 import (
 	"debug/elf"

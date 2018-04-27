@@ -201,6 +201,7 @@ const (
 	CALLCODE
 	RETURN
 	DELEGATECALL
+	ENI
 
 	SELFDESTRUCT = 0xff
 )
@@ -355,6 +356,7 @@ var opCodeToString = map[OpCode]string{
 	RETURN:       "RETURN",
 	CALLCODE:     "CALLCODE",
 	DELEGATECALL: "DELEGATECALL",
+	ENI:          "ENI",
 	SELFDESTRUCT: "SELFDESTRUCT",
 
 	PUSH: "PUSH",
@@ -502,6 +504,7 @@ var stringToOp = map[string]OpCode{
 	"RETURN":       RETURN,
 	"CALLCODE":     CALLCODE,
 	"SELFDESTRUCT": SELFDESTRUCT,
+	"ENI":          ENI,
 }
 
 func StringToOp(str string) OpCode {
