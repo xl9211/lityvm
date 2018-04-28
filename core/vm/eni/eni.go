@@ -106,8 +106,11 @@ func getEniFunctions() map[string]string {
 		return nil
 	}
 
-	// TODO: get library path from environment variable
+	// Get dynamic library path.
 	libPath := filepath.Join(node.DefaultDataDir(), "eni", "lib")
+	if val, ok := os.LookupEnv("ENI_LIBRARY_PATH"); ok {
+		libPath = val
+	}
 	var dynamicLibs []string
 	fileinfo, err := os.Stat(libPath)
 	if err != nil {
