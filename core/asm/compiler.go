@@ -237,22 +237,16 @@ func (c *Compiler) pushBin(v interface{}) {
 // isPush returns whether the string op is either any of
 // push(N).
 func isPush(op string) bool {
-	if op == "push" {
-		return true
-	}
-	return false
+	return strings.ToUpper(op) == "PUSH"
 }
 
 // isJump returns whether the string op is jump(i)
 func isJump(op string) bool {
-	return op == "jumpi" || op == "jump"
+	return strings.ToUpper(op) == "JUMPI" || strings.ToUpper(op) == "JUMP"
 }
 
 // toBinary converts text to a vm.OpCode
 func toBinary(text string) vm.OpCode {
-	if isPush(text) {
-		text = "push1"
-	}
 	return vm.StringToOp(strings.ToUpper(text))
 }
 
