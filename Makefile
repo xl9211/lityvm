@@ -10,6 +10,7 @@
 
 GOBIN = build/bin
 GO ?= latest
+CGO_LDFLAGS = -L$(HOME)/.ethereum/eni/lib -Wl,-rpath,$(HOME)/.ethereum/eni/lib
 
 geth:
 	build/env.sh go run build/ci.go install ./cmd/geth
@@ -22,7 +23,7 @@ swarm:
 	@echo "Run \"$(GOBIN)/swarm\" to launch swarm."
 
 evm:
-	build/env.sh go run build/ci.go install ./cmd/evm
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install ./cmd/evm
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/evm\" to start the evm."
 
