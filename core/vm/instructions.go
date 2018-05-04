@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm/eni/arg_parser"
+	"github.com/ethereum/go-ethereum/core/vm/eni/ret_parser"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -660,22 +661,33 @@ func opDelegateCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, st
 
 func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	// get arguments
-	funcName := string(stack.pop().Bytes()).Trim(string(funcName), "\x00")
+	funcName := strings.Trim(string(string(stack.pop().Bytes())), "\x00")
 	typeOffset, dataOffset := stack.pop().Int64(), stack.pop().Int64()
-	typeLength := new(big.Int).SetBytes(memory.Get(typeOffset, 32)).Int64()
-	dataLength := new(big.Int).SetBytes(memory.Get(dataOffset, 32)).Int64()
 
-	typeSection := memory.Get(typeOffset+32, typeLength)
-	dataSection := memory.Get(dataOffset+32, dataLength)
+	argsTypeLength := new(big.Int).SetBytes(memory.Get(typeOffset, 32)).Int64()
+	argsDataLength := new(big.Int).SetBytes(memory.Get(dataOffset, 32)).Int64()
 
-	argsText := arg_parser.Parse(typeSection, dataSection)
-
+	if argsDataLength%32 > 0 {
+		argsDataLength += 32 - argsDataLength%32
+	}
+	argsType := memory.Get(typeOffset+32, argsTypeLength)
+	argsData := memory.Get(dataOffset+32, argsDataLength)
+	argsText := arg_parser.Parse(argsType, argsData)
 	retText := evm.eni.ExecuteENI(funcName, argsText)
 
-	// TODO: parse return value
-	retAddr := uint64(7112)
-	memory.Resize(retAddr + uint64(len(retText)))
-	memory.Set(retAddr, 32, []byte(retText))
+	retTypeOffset := typeOffset + 32 + argsTypeLength
+	if retTypeOffset%32 > 0 {
+		retTypeOffset += 32 - retTypeOffset%32
+	}
+	retTypeLength := new(big.Int).SetBytes(memory.Get(retTypeOffset, 32)).Int64()
+	retType := memory.Get(retTypeOffset+32, retTypeLength)
+	retData := ret_parser.Parse(retType, retText)
+	retDataOffset := dataOffset + 32 + argsDataLength
+	retDataLength := math.PaddedBigBytes(big.NewInt(int64(len(retData))), 32)
+
+	memory.Resize(uint64(retDataOffset + 32 + int64(len(retData))))
+	memory.Set(uint64(retDataOffset), 32, retDataLength)
+	memory.Set(uint64(retDataOffset+32), uint64(len(retData)), retData)
 	return nil, nil
 }
 
