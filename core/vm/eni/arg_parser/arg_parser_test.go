@@ -1,10 +1,9 @@
 package arg_parser
-import "testing"
 import "bytes"
 import "fmt"
 
 // single positive integer (big endian)
-func ExampleA(){
+func ExamplePosInt(){
     var f, d []byte
     var buf bytes.Buffer;
 
@@ -15,19 +14,6 @@ func ExampleA(){
     parse_entry_point(f, d, &buf)
     fmt.Println(buf.String())
     // Output: [72]
-}
-
-// single positive integer (big endian)
-func TestB(t *testing.T){
-    var f, d []byte
-    var buf bytes.Buffer;
-
-    f = make([]byte, 1, 1)
-    d = make([]byte, 70, 70)
-    f[0] = INT
-    a:= -72
-    d[31] = byte(a) // 32-byte big endian
-    parse_entry_point(f, d, &buf)
 }
 
 // a int and a bool
@@ -41,6 +27,20 @@ func ExampleC(){
     fmt.Println(buf.String())
 
     // Output: [72,false]
+}
+
+// a int and a bool
+func ExampleNegInt(){
+    var buf bytes.Buffer;
+    
+    f := [1]byte{INT}
+    var d [70] byte
+    for i:=0; i<32; i++ { d[i] = uint8(255) }
+
+    parse_entry_point(f[:], d[:], &buf)
+    fmt.Println(buf.String())
+
+    // Output: [-1]
 }
 
 // two strings

@@ -1,4 +1,5 @@
 package ret_parser
+
 import "fmt"
 import "bytes"
 import "math/big"
@@ -271,7 +272,7 @@ func parse_string(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []
     expect(&json, '"')
     length := int64(0)
     for json[length]!='"'{length++}
-    
+
     data.Write(math.PaddedBigBytes(big.NewInt(length), 32))
     data.Write(json[:length])
     if length%32>0 { data.Write(make([]byte, 32-length))}
@@ -344,35 +345,24 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
 
         }
     }else if INT<=t && t<=INT256{ // signed integer
-        // i := 0
-        // if have(&json,'-') { i++ }
-        // json := json[1:]
-        // ojson := json
-        // for have_digit(&json) { i++ }
-        // n := new(big.Int)
-        // n.SetString(string(ojson[0:i]), 10)
-        // b := n.Bytes()// TODO two's complement
-        // if len(b) < 32{
-        //     diff:= 32 - len(b)
-        //     b = append(b, make([]int, diff))
-        // }
-        // data.Write(b)
+        i := 0
+        ojson := json
+        if have(&json,'-') { i++ }
+        for have_digit(&json) { i++ }
+        var n big.Int
+        n.SetString(string(ojson[0:i]), 10)
+        b := math.PaddedBigBytes(n, 32)
+        data.Write(b)
     }else if (UINT<=t && t<=UINT256) || (BYTE1<=t && t<=BYTE32){// unsigned integer
-        // i := 0
-        // ojson := json
-        // for have_digit(&json) { i++ }
-        n := new(big.Int)
-
-        // n.SetString(string(ojson[0:i]), 10)
-        b := n.Bytes()
-        // if len(b) < 32{
-        //     diff:= 32 - len(b)
-        //     b = append(b, make([]int, diff))
-        // }
+        i := 0
+        ojson := json
+        for have_digit(&json) { i++ }
+        var n big.Int
+        n.SetString(string(ojson[0:i]), 10)
+        b := math.PaddedBigBytes(n, 32)
         data.Write(b)
     }
     type_info = type_info[1:]
-    // data = data[dataLen[t]:]
     return type_info, json
 }
 

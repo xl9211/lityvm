@@ -342,12 +342,24 @@ func parse_value(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []b
         json.WriteString( fmt.Sprint(0!=data[0]) )
     }else if INT<=t && t<=INT256{ // signed integer
         n := new(big.Int)
-        n.SetBytes(data[:dataLen[t]])
-        json.WriteString(n.String())
+        var b [32] byte
+        copy(b[:], data[:dataLen[t]])
+        if(b[0]>=128){ // negative value, two's complement
+            n.SetBytes(b[:])
+            n = n.Sub(n, big.NewInt(int64(1)))
+            copy(b[:], n.Bytes())
+            for i:=0; i<32; i++ {b[i] ^= 255}
+            n.SetBytes(b[:])
+            n = n.Mul(n, big.NewInt(int64(-1)))
+            json.WriteString(n.String())
+        }else{ // positive value
+            n.SetBytes(b[:])
+            json.WriteString(n.String())
+        }
+        
     }else if (UINT<=t && t<=UINT256) || (BYTE1<=t && t<=BYTE32){// unsigned integer
         n := new(big.Int)
-        // SetBytes interprets buf as the bytes of a big-endian unsigned. Reference: https://golang.org/src/math/big/int.go
-        n.SetBytes(data[:dataLen[t]])
+        n.SetBytes(data[:dataLen[t]]) // big endian
         json.WriteString(n.String())
     }
     type_info = type_info[1:]
