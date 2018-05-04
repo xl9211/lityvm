@@ -175,6 +175,11 @@ func (in *Interpreter) Run(snapshot int, contract *Contract, input []byte) (ret 
 			}
 		}
 
+		// initialize operation environment
+		if operation.init != nil {
+			operation.init(in.evm, stack, mem)
+		}
+
 		if !in.cfg.DisableGasMetering {
 			// consume the gas and return an error if not enough gas is available.
 			// cost is explicitly set so that the capture state defer method cas get the proper cost

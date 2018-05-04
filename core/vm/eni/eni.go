@@ -41,6 +41,9 @@ import (
 type ENI struct {
 	// functions & dynamic libraries mapping used by ENI
 	functions map[string]string
+	// native functions for create & destroy functor
+	create  unsafe.Pointer
+	destroy unsafe.Pointer
 }
 
 func NewENI() *ENI {
@@ -49,7 +52,7 @@ func NewENI() *ENI {
 	}
 }
 
-func (eni *ENI) ExecuteENI(eniFunction string, data string) string {
+func (eni *ENI) InitENI(eniFunction string, data string) error {
 	// Check If function exists.
 	dynamicLib := make(map[string]string)
 	var ok bool
@@ -75,28 +78,33 @@ func (eni *ENI) ExecuteENI(eniFunction string, data string) string {
 	}
 
 	// Prepare create & destroy functions.
-	eni_create := C.dlsym(handler, C.CString(eniFunction+"_create"))
-	if eni_create == nil {
+	eni.create = C.dlsym(handler, C.CString(eniFunction+"_create"))
+	if eni.create == nil {
 		panic("dlsym failed: " + eniFunction)
 	}
-	eni_destroy := C.dlsym(handler, C.CString(eniFunction+"_destroy"))
-	if eni_destroy == nil {
+	eni.destroy = C.dlsym(handler, C.CString(eniFunction+"_destroy"))
+	if eni.destroy == nil {
 		panic("dlsym failed: " + eniFunction)
 	}
 
 	// Create functor.
-	C.eni_create((*C.eni_create_t)(eni_create), C.CString(data))
+	C.eni_create((*C.eni_create_t)(eni.create), C.CString(data))
 
-	// Calculate gas usage.
-	_ = uint64(C.eni_gas(C.functor))
+	return nil
+}
 
+func (eni *ENI) Gas() uint64 {
+	return uint64(C.eni_gas(C.functor))
+}
+
+func (eni *ENI) ExecuteENI() string {
 	// Run ENI function.
 	outputCString := C.eni_run(C.functor)
 	outputGoString := C.GoString(outputCString)
 	defer C.free(unsafe.Pointer(outputCString))
 
 	// Destroy functor.
-	C.eni_destroy((*C.eni_destroy_t)(eni_destroy))
+	C.eni_destroy((*C.eni_destroy_t)(eni.destroy))
 
 	return outputGoString
 }

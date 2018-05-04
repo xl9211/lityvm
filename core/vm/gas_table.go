@@ -434,3 +434,7 @@ func gasSwap(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem
 func gasDup(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 	return GasFastestStep, nil
 }
+
+func gasENI(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
+	return evm.eni.Gas(), nil
+}

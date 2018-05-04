@@ -19,12 +19,10 @@ package vm
 import (
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm/eni/arg_parser"
 	"github.com/ethereum/go-ethereum/core/vm/eni/ret_parser"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -660,21 +658,20 @@ func opDelegateCall(pc *uint64, evm *EVM, contract *Contract, memory *Memory, st
 }
 
 func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// get arguments
-	funcName := strings.Trim(string(string(stack.pop().Bytes())), "\x00")
+	// TODO: how to make it clear?
+	_ = stack.pop()
 	typeOffset, dataOffset := stack.pop().Int64(), stack.pop().Int64()
-
 	argsTypeLength := new(big.Int).SetBytes(memory.Get(typeOffset, 32)).Int64()
 	argsDataLength := new(big.Int).SetBytes(memory.Get(dataOffset, 32)).Int64()
 
 	if argsDataLength%32 > 0 {
 		argsDataLength += 32 - argsDataLength%32
 	}
-	argsType := memory.Get(typeOffset+32, argsTypeLength)
-	argsData := memory.Get(dataOffset+32, argsDataLength)
-	argsText := arg_parser.Parse(argsType, argsData)
-	retText := evm.eni.ExecuteENI(funcName, argsText)
 
+	// We already initialized ENI environment so we only need to call it here.
+	retText := evm.eni.ExecuteENI()
+
+	// Parse returned data
 	retTypeOffset := typeOffset + 32 + argsTypeLength
 	if retTypeOffset%32 > 0 {
 		retTypeOffset += 32 - retTypeOffset%32

@@ -19,7 +19,9 @@ package vm
 import (
 	"errors"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/core/vm/eni/arg_parser"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -28,6 +30,7 @@ type (
 	gasFunc             func(params.GasTable, *EVM, *Contract, *Stack, *Memory, uint64) (uint64, error) // last parameter is the requested memory size as a uint64
 	stackValidationFunc func(*Stack) error
 	memorySizeFunc      func(*Stack) *big.Int
+	initFunc            func(*EVM, *Stack, *Memory) error
 )
 
 var errGasUintOverflow = errors.New("gas uint64 overflow")
@@ -41,6 +44,8 @@ type operation struct {
 	validateStack stackValidationFunc
 	// memorySize returns the memory size required for the operation
 	memorySize memorySizeFunc
+	// init initialized operation environment
+	init initFunc
 	// halts indicates whether the operation shoult halt further execution
 	// and return
 	halts bool
@@ -879,10 +884,28 @@ func NewFrontierInstructionSet() [256]operation {
 		},
 		ENI: {
 			execute:       opENI,
-			gasCost:       constGasFunc(params.JumpdestGas),
+			gasCost:       gasENI,
 			validateStack: makeStackFunc(0, 0),
+			init:          initENI,
 			valid:         true,
 		},
-
 	}
+}
+
+func initENI(evm *EVM, stack *Stack, memory *Memory) error {
+	// get arguments
+	funcName := strings.Trim(string(string(stack.Back(0).Bytes())), "\x00")
+	typeOffset, dataOffset := stack.Back(1).Int64(), stack.Back(2).Int64()
+
+	argsTypeLength := new(big.Int).SetBytes(memory.Get(typeOffset, 32)).Int64()
+	argsDataLength := new(big.Int).SetBytes(memory.Get(dataOffset, 32)).Int64()
+
+	if argsDataLength%32 > 0 {
+		argsDataLength += 32 - argsDataLength%32
+	}
+	argsType := memory.Get(typeOffset+32, argsTypeLength)
+	argsData := memory.Get(dataOffset+32, argsDataLength)
+	argsText := arg_parser.Parse(argsType, argsData)
+
+	return evm.eni.InitENI(funcName, argsText)
 }
