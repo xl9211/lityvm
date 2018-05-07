@@ -351,7 +351,7 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
         for have_digit(&json) { i++ }
         var n big.Int
         n.SetString(string(ojson[0:i]), 10)
-        b := math.PaddedBigBytes(n, 32)
+        b := math.PaddedBigBytes(&n, 32)
         data.Write(b)
     }else if (UINT<=t && t<=UINT256) || (BYTE1<=t && t<=BYTE32){// unsigned integer
         i := 0
@@ -359,7 +359,7 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
         for have_digit(&json) { i++ }
         var n big.Int
         n.SetString(string(ojson[0:i]), 10)
-        b := math.PaddedBigBytes(n, 32)
+        b := math.PaddedBigBytes(&n, 32)
         data.Write(b)
     }
     type_info = type_info[1:]
