@@ -271,10 +271,15 @@ func parse_string(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []
     skip_ws(&json)
     expect(&json, '"')
     length := int64(0)
-    for json[length]!='"'{length++}
+    var buf bytes.Buffer
+    for json[length]!='"'{
+        if json[length]=='\\' { length++}
+        buf.WriteByte(json[length+1])
+        length++
+    }
 
     data.Write(math.PaddedBigBytes(big.NewInt(length), 32))
-    data.Write(json[:length])
+    data.Write(buf.Bytes())
     if length%32>0 { data.Write(make([]byte, 32-length))}
     json = json[length:]
     expect(&json, '"')
