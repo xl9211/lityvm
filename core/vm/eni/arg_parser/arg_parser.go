@@ -236,7 +236,6 @@ var dataLen = map[byte]int{
 	BYTE31:  31,
 	BYTE32:  32}
 
-// TODO
 func Parse(type_info []byte, data []byte) string {
 	var json bytes.Buffer
 	parse_entry_point(type_info, data, &json)
@@ -297,21 +296,20 @@ func parse_string(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []
 	return type_info, data
 }
 
-// parsing int32 not finished
-func parse_fix_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
-	type_info = type_info[1:] // fix_array_start
-	json.WriteString("[")
-	leng := int(type_info[31]) // TODO: parsing a 32-byte integer
-	type_info = type_info[32:] //
+func parse_fix_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte){
+    type_info = type_info[1:] // fix_array_start
+    json.WriteString("[")
+    leng := new(big.Int).SetBytes(type_info[:32]).Int64()
+    type_info = type_info[32:]
 
-	for i := 0; i < leng; i++ {
-		if i == leng-1 {
-			type_info, data = parse_type(type_info, data, json)
-		} else {
-			json.WriteString(", ")
-			_, data = parse_type(type_info, data, json)
-		}
-	}
+    for i:=int64(0); i<leng; i++{
+        if i==leng-1 {
+            type_info, data = parse_type(type_info, data, json)
+        }else{
+            json.WriteString(", ")
+            _, data = parse_type(type_info, data, json)
+        }
+    }
 
 	json.WriteString("]")
 	return type_info, data

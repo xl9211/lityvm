@@ -127,7 +127,6 @@ var complexType = map[byte]bool{
 	STRING:          true,
 }
 
-// TODO
 func Parse(type_info []byte, jsonStr string) []byte {
 	json := []byte(jsonStr)
 	skip_ws(&json)
@@ -196,23 +195,22 @@ func parse_dyn_array(type_info []byte, data *bytes.Buffer, json []byte) ([]byte,
 	return type_info, json
 }
 
-// parsing int32 not finished
-func parse_fix_array(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	type_info = type_info[1:] // fix_array_start
-	skip_ws(&json)
-	expect(&json, '[')
-	leng := int(type_info[0])  // TODO: parsing a 32-byte integer
-	type_info = type_info[32:] //
+func parse_fix_array(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte){
+    type_info = type_info[1:] // fix_array_start
+    skip_ws(&json)
+    expect(&json, '[')
+    leng := new(big.Int).SetBytes(type_info[:32]).Int64()
+    type_info = type_info[32:]
 
-	for i := 0; i < leng; i++ {
-		if i == leng-1 {
-			type_info, json = parse_type(type_info, data, json)
-		} else {
-			skip_ws(&json)
-			expect(&json, ',')
-			_, json = parse_type(type_info, data, json)
-		}
-	}
+    for i:=int64(0); i<leng; i++{
+        if i==leng-1 {
+            type_info, json = parse_type(type_info, data, json)
+        }else{
+            skip_ws(&json)
+            expect(&json, ',')
+            _, json = parse_type(type_info, data, json)
+        }
+    }
 
 	skip_ws(&json)
 	expect(&json, ']')
@@ -254,33 +252,32 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
 			data.WriteByte(byte(0))
 		} else { // err
 
-		}
-	} else if INT <= t && t <= INT256 { // signed integer
-		i := 0
-		ojson := json
-		if have(&json, '-') {
-			i++
-		}
-		for have_digit(&json) {
-			i++
-		}
-		var n big.Int
-		n.SetString(string(ojson[0:i]), 10)
-		b := math.PaddedBigBytes(&n, 32)
-		data.Write(b)
-	} else if (UINT <= t && t <= UINT256) || (BYTE1 <= t && t <= BYTE32) { // unsigned integer
-		i := 0
-		ojson := json
-		for have_digit(&json) {
-			i++
-		}
-		var n big.Int
-		n.SetString(string(ojson[0:i]), 10)
-		b := math.PaddedBigBytes(&n, 32)
-		data.Write(b)
-	}
-	type_info = type_info[1:]
-	return type_info, json
+        }
+    }else if INT<=t && t<=INT256{ // signed integer
+        i := 0
+        ojson := json
+        if have(&json,'-') { i++ }
+        for have_digit(&json) { i++ }
+        // TODO: two's complement
+        n := new(big.Int)
+        n.SetString(string(ojson[0:i]), 10)
+        b := math.PaddedBigBytes(n, 32)
+        for i:=0; i<32; i++ { b[i] ^= byte(255) }
+        n.SetBytes(b)
+        n.Add(n, big.NewInt(int64(1)))
+        b = math.PaddedBigBytes(n, 32)
+        data.Write(b)
+    }else if (UINT<=t && t<=UINT256) || (BYTE1<=t && t<=BYTE32){// unsigned integer
+        i := 0
+        ojson := json
+        for have_digit(&json) { i++ }
+        var n big.Int
+        n.SetString(string(ojson[0:i]), 10)
+        b := math.PaddedBigBytes(&n, 32)
+        data.Write(b)
+    }
+    type_info = type_info[1:]
+    return type_info, json
 }
 
 func have(json *[]byte, c byte) bool {
@@ -292,13 +289,13 @@ func have(json *[]byte, c byte) bool {
 	}
 }
 
-func have_digit(json *[]byte) bool {
-	if (*json)[0] >= '9' && (*json)[0] <= '9' {
-		*json = (*json)[1:]
-		return true
-	} else {
-		return false
-	}
+func have_digit(json *[]byte) (bool){
+    if len(*json)>0 && (*json)[0]>='0' && (*json)[0]<='9' {
+        *json = (*json)[1:]
+        return true
+    }else{
+        return false
+    }
 }
 
 func expect(json *[]byte, c byte) {
