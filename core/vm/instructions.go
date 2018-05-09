@@ -681,7 +681,8 @@ func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stac
 	}
 	retTypeLength := new(big.Int).SetBytes(memory.Get(retTypeOffset, 32)).Int64()
 	retType := memory.Get(retTypeOffset+32, retTypeLength)
-	retData := ret_parser.Parse(retType, retText)
+	retData, err := ret_parser.Parse(retType, retText)
+	if err !=nil { return nil, err}
 	retDataOffset := dataOffset + 32 + argsDataLength
 	retDataLength := math.PaddedBigBytes(big.NewInt(int64(len(retData))), 32)
 
