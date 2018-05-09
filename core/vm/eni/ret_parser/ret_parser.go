@@ -162,6 +162,8 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
         n.SetString(string(ojson[0:i]), 10)
         b := math.PaddedBigBytes(&n, 32)
         data.Write(b)
+    }else{
+        // TODO: unknown code
     }
     type_info = type_info[1:]
     return type_info, json
