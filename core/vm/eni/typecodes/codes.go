@@ -220,3 +220,16 @@ var DataLen = map[byte]int{
     BYTE30:30,
     BYTE31:31,
     BYTE32:32}
+
+func IsInt(code byte) bool{
+    return (INT<=code && code<=INT256) 
+}
+
+func IsUint(code byte) bool{
+    return (UINT<=code && code<=UINT256) || (BYTE1<=code && code<=BYTE32)
+}
+
+func IsBool(code byte) bool{
+    return BOOL==code 
+}
+

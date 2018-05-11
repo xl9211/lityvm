@@ -1,12 +1,23 @@
 package ret_parser
 import "fmt"
 import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
+
+
+
 func ExampleNegInt(){
     f := [1]byte{typecodes.INT}
     d, _ := Parse(f[:], "[-123]")
 
     fmt.Printf("%v\n",d)
     // Output: [255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 133]
+}
+
+func ExampleString(){
+    f := [1]byte{typecodes.STRING}
+    d, _ := Parse(f[:], "[\"-123\\\"\"]")
+
+    fmt.Printf("%v\n",d)
+    // Output: [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6 45 49 50 51 34 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
 }
 
 func ExampleFixArray(){
@@ -33,7 +44,7 @@ func ExampleError1(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // Output: expected '[', found '-' 
+    // Output: Return Parser Error: expected '[', found '-' 
 }
 
 func ExampleError2(){
@@ -45,7 +56,7 @@ func ExampleError2(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // expected uint, found '-'
+    // Output: Return Parser Error: expected uint, found '-'
 }
 
 func ExampleError3(){
@@ -57,7 +68,7 @@ func ExampleError3(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // Output: expected '"', found '-' 
+    // Output: Return Parser Error: expected '"', found '-' 
 }
 
 func ExampleErrorInt(){
@@ -77,8 +88,8 @@ func ExampleErrorInt(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // Output: expected int, found '-'
-    // expected uint, found '-'
+    // Output: Return Parser Error: expected int, found '-'
+    // Return Parser Error: expected uint, found '-'
 }
 
 func ExampleErrorBool(){
@@ -98,8 +109,8 @@ func ExampleErrorBool(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // Output: expected 'u', found 'e' 
-    // expected boolean, found 'j'
+    // Output: Return Parser Error: expected 'u', found 'e' 
+    // Return Parser Error: expected boolean, found 'j'
 }
 
 func ExampleErrorFixArray(){
@@ -114,5 +125,5 @@ func ExampleErrorFixArray(){
     }else{
     	fmt.Printf("%v\n",d)
     }
-    // Output: expected int, found 'a'
+    // Output: Return Parser Error: expected int, found 'a'
 }
