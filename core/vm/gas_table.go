@@ -436,5 +436,9 @@ func gasDup(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem 
 }
 
 func gasENI(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-	return evm.eni.Gas(), nil
+	gas, err := evm.eni.Gas()
+	if err != nil {
+		return 0, err
+	}
+	return gas, nil
 }

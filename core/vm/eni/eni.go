@@ -30,6 +30,7 @@ import "C"
 
 import (
 	"debug/elf"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,44 +48,49 @@ type ENI struct {
 }
 
 func NewENI() *ENI {
-	return &ENI{
-		functions: getEniFunctions(),
-	}
+	return &ENI{}
 }
 
 func (eni *ENI) InitENI(eniFunction string, data string) error {
+	// Get functions & dynamic libraries mappings
+	functions, err := getEniFunctions()
+	if err != nil {
+		return err
+	}
+	eni.functions = functions
+
 	// Check If function exists.
 	dynamicLib := make(map[string]string)
 	var ok bool
 	dynamicLib["create"], ok = eni.functions[eniFunction+"_create"]
 	if !ok {
-		panic("create function not exists: " + eniFunction)
+		return errors.New("create function not exists: " + eniFunction)
 	}
 	dynamicLib["destroy"], ok = eni.functions[eniFunction+"_destroy"]
 	if !ok {
-		panic("destroy function not exists: " + eniFunction)
+		return errors.New("destroy function not exists: " + eniFunction)
 	}
 
 	// Check create & destroy method in the same dynamic library
 	if dynamicLib["create"] != dynamicLib["destroy"] {
-		panic("create and destroy method are not in the same dynamic library")
+		return errors.New("create and destroy method are not in the same dynamic library")
 	}
 	dynamicLibName := dynamicLib["create"]
 
 	// Load dynamic library.
 	handler := C.dlopen(C.CString(dynamicLibName), C.RTLD_LAZY)
 	if handler == nil {
-		panic("dlopen failed: " + dynamicLibName)
+		return errors.New("dlopen failed: " + dynamicLibName)
 	}
 
 	// Prepare create & destroy functions.
 	eni.create = C.dlsym(handler, C.CString(eniFunction+"_create"))
 	if eni.create == nil {
-		panic("dlsym failed: " + eniFunction)
+		return errors.New("dlsym failed: " + eniFunction + "_create")
 	}
 	eni.destroy = C.dlsym(handler, C.CString(eniFunction+"_destroy"))
 	if eni.destroy == nil {
-		panic("dlsym failed: " + eniFunction)
+		return errors.New("dlsym failed: " + eniFunction + "_destroy")
 	}
 
 	// Create functor.
@@ -93,11 +99,11 @@ func (eni *ENI) InitENI(eniFunction string, data string) error {
 	return nil
 }
 
-func (eni *ENI) Gas() uint64 {
-	return uint64(C.eni_gas(C.functor))
+func (eni *ENI) Gas() (uint64, error) {
+	return uint64(C.eni_gas(C.functor)), nil
 }
 
-func (eni *ENI) ExecuteENI() string {
+func (eni *ENI) ExecuteENI() (string, error) {
 	// Run ENI function.
 	outputCString := C.eni_run(C.functor)
 	outputGoString := C.GoString(outputCString)
@@ -106,12 +112,12 @@ func (eni *ENI) ExecuteENI() string {
 	// Destroy functor.
 	C.eni_destroy((*C.eni_destroy_t)(eni.destroy))
 
-	return outputGoString
+	return outputGoString, nil
 }
 
-func getEniFunctions() map[string]string {
+func getEniFunctions() (map[string]string, error) {
 	if runtime.GOOS != "linux" {
-		return nil
+		return nil, errors.New("currently ENI is only supported on Linux")
 	}
 
 	// Get dynamic library path.
@@ -122,13 +128,10 @@ func getEniFunctions() map[string]string {
 	var dynamicLibs []string
 	fileinfo, err := os.Stat(libPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		panic(err)
+		return nil, err
 	}
 	if !fileinfo.Mode().IsDir() {
-		panic("Can't file dynamic library path: " + libPath)
+		return nil, errors.New("can't find dynamic library path: " + libPath)
 	}
 
 	// Get all dynamic libraries from library path.
@@ -144,12 +147,12 @@ func getEniFunctions() map[string]string {
 	for _, lib := range dynamicLibs {
 		elf, err := elf.Open(lib)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		symbols, err := elf.DynamicSymbols()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 
 		for _, symbol := range symbols {
@@ -157,5 +160,5 @@ func getEniFunctions() map[string]string {
 		}
 	}
 
-	return functions
+	return functions, nil
 }

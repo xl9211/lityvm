@@ -669,7 +669,10 @@ func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stac
 	}
 
 	// We already initialized ENI environment so we only need to call it here.
-	retText := evm.eni.ExecuteENI()
+	retText, err := evm.eni.ExecuteENI()
+	if err != nil {
+		return nil, err
+	}
 
 	// Parse returned data
 	retTypeOffset := typeOffset + 32 + argsTypeLength

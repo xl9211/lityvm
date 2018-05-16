@@ -177,7 +177,10 @@ func (in *Interpreter) Run(snapshot int, contract *Contract, input []byte) (ret 
 
 		// initialize operation environment
 		if operation.init != nil {
-			operation.init(in.evm, stack, mem)
+			err = operation.init(in.evm, stack, mem)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if !in.cfg.DisableGasMetering {
