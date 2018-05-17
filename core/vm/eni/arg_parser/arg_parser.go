@@ -331,9 +331,10 @@ func parse_struct(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []
 		if 0 < i {
 			json.WriteString(", ")
 		}
-		if t != STRUCT_END {
-			type_info, data = parse_type(type_info, data, json)
+		if t == STRUCT_END {
+			break
 		}
+		type_info, data = parse_type(type_info, data, json)
 	}
 	type_info = type_info[1:] // struct_end
 	json.WriteString("]")

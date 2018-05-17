@@ -127,109 +127,6 @@ var complexType = map[byte]bool{
 	STRING:          true,
 }
 
-// in bytes
-// only for value type
-var dataLen = map[byte]int{
-	BOOL:    1,
-	INT:     32,
-	UINT:    32,
-	INT8:    1,
-	INT16:   2,
-	INT24:   3,
-	INT32:   4,
-	INT40:   5,
-	INT48:   6,
-	INT56:   7,
-	INT64:   8,
-	INT72:   9,
-	INT80:   10,
-	INT88:   11,
-	INT96:   12,
-	INT104:  13,
-	INT112:  14,
-	INT120:  15,
-	INT128:  16,
-	INT136:  17,
-	INT144:  18,
-	INT152:  19,
-	INT160:  20,
-	INT168:  21,
-	INT176:  22,
-	INT184:  23,
-	INT192:  24,
-	INT200:  25,
-	INT208:  26,
-	INT216:  27,
-	INT224:  28,
-	INT232:  29,
-	INT240:  30,
-	INT248:  31,
-	INT256:  32,
-	UINT8:   1,
-	UINT16:  2,
-	UINT24:  3,
-	UINT32:  4,
-	UINT40:  5,
-	UINT48:  6,
-	UINT56:  7,
-	UINT64:  8,
-	UINT72:  9,
-	UINT80:  10,
-	UINT88:  11,
-	UINT96:  12,
-	UINT104: 13,
-	UINT112: 14,
-	UINT120: 15,
-	UINT128: 16,
-	UINT136: 17,
-	UINT144: 18,
-	UINT152: 19,
-	UINT160: 20,
-	UINT168: 21,
-	UINT176: 22,
-	UINT184: 23,
-	UINT192: 24,
-	UINT200: 25,
-	UINT208: 26,
-	UINT216: 27,
-	UINT224: 28,
-	UINT232: 29,
-	UINT240: 30,
-	UINT248: 31,
-	UINT256: 32,
-	BYTE1:   1,
-	BYTE2:   2,
-	BYTE3:   3,
-	BYTE4:   4,
-	BYTE5:   5,
-	BYTE6:   6,
-	BYTE7:   7,
-	BYTE8:   8,
-	BYTE9:   9,
-	BYTE10:  10,
-	BYTE11:  11,
-	BYTE12:  12,
-	BYTE13:  13,
-	BYTE14:  14,
-	BYTE15:  15,
-	BYTE16:  16,
-	BYTE17:  17,
-	BYTE18:  18,
-	BYTE19:  19,
-	BYTE20:  20,
-	BYTE21:  21,
-	BYTE22:  22,
-	BYTE23:  23,
-	BYTE24:  24,
-	BYTE25:  25,
-	BYTE26:  26,
-	BYTE27:  27,
-	BYTE28:  28,
-	BYTE29:  29,
-	BYTE30:  30,
-	BYTE31:  31,
-	BYTE32:  32}
-
 // TODO
 func Parse(type_info []byte, jsonStr string) []byte {
 	json := []byte(jsonStr)
@@ -329,9 +226,10 @@ func parse_struct(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []
 		t := type_info[0]
 		skip_ws(&json)
 		expect(&json, ',')
-		if t != STRUCT_END {
-			type_info, json = parse_type(type_info, data, json)
+		if t == STRUCT_END {
+			break
 		}
+		type_info, json = parse_type(type_info, data, json)
 	}
 	type_info = type_info[1:] // struct_end
 	skip_ws(&json)
