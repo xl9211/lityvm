@@ -1,14 +1,15 @@
 package ret_parser
+
 import "fmt"
 
-func ExampleNegInt(){
-    var buf bytes.Buffer;
-    
-    f := [1]byte{INT}
+func ExampleNegInt() {
+	var buf bytes.Buffer
 
-    d := Parse(f,"-123")
+	f := [1]byte{INT}
 
-    fmt.Printf("%v\n",d)
+	d := Parse(f, "-123")
 
-    // Output: [-1]
+	fmt.Printf("%v\n", d)
+
+	// Output: [-1]
 }
