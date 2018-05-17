@@ -8,24 +8,22 @@
 // TODO: bytes
 package arg_parser
 
-import (
-	"bytes"
-	"fmt"
-	"math/big"
-)
-
+import "math/big"
+import "bytes"
+import "fmt"
 import "errors"
+
 import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
 
-func Parse(type_info []byte, data []byte) (ret string, err error){
-    defer func() {
-        if r := recover(); r != nil {
-            err = errors.New("Argument Parser Error: "+r.(string))
-        }
-    }()
-    var json bytes.Buffer
-    parse_entry_point(type_info, data, &json)
-    return json.String(), err
+func Parse(type_info []byte, data []byte) (ret string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint("Argument Parser Error: ", r))
+		}
+	}()
+	var json bytes.Buffer
+	parse_entry_point(type_info, data, &json)
+	return json.String(), err
 }
 
 func parse_entry_point(type_info []byte, data []byte, json *bytes.Buffer) {
@@ -41,18 +39,16 @@ func parse_entry_point(type_info []byte, data []byte, json *bytes.Buffer) {
 
 // assuming that data are packed
 func parse_type(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
-    t := type_info[0]
-    if typecodes.ComplexType[t]{
-        if t==typecodes.FIX_ARRAY_START{
-            type_info, data = parse_fix_array(type_info, data, json)
-        }else if t==typecodes.DYN_ARRAY_START{
-            type_info, data = parse_dyn_array(type_info, data, json)
-        }else if t==typecodes.STRUCT_START{
-            type_info, data = parse_struct(type_info, data, json)
-        }else if t==typecodes.STRING{
-            type_info, data = parse_string(type_info, data, json)
-        }else{// error
-
+	t := type_info[0]
+	if typecodes.ComplexType[t] {
+		if t == typecodes.FIX_ARRAY_START {
+			type_info, data = parse_fix_array(type_info, data, json)
+		} else if t == typecodes.DYN_ARRAY_START {
+			type_info, data = parse_dyn_array(type_info, data, json)
+		} else if t == typecodes.STRUCT_START {
+			type_info, data = parse_struct(type_info, data, json)
+		} else if t == typecodes.STRING {
+			type_info, data = parse_string(type_info, data, json)
 		}
 	} else { // value type
 		type_info, data = parse_value(type_info, data, json)
@@ -69,8 +65,12 @@ func parse_string(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []
 	for i := int64(0); i < leng; i++ {
 		if data[i] == '\\' || data[i] == '"' {
 			buffer.WriteByte('\\')
+			buffer.WriteByte(data[i])
+		} else if data[i] < 0x20 { // control characters
+			buffer.WriteString(fmt.Sprintf("\\u%04X", data[i]))
+		} else {
+			buffer.WriteByte(data[i])
 		}
-		buffer.WriteByte(data[i])
 	}
 	json.WriteString("\"")
 	json.WriteString(buffer.String())
@@ -82,76 +82,89 @@ func parse_string(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []
 	return type_info, data
 }
 
-func parse_fix_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte){
-    type_info = type_info[1:] // fix_array_start
-    json.WriteString("[")
-    leng := new(big.Int).SetBytes(type_info[:32]).Int64()
-    type_info = type_info[32:]
+// parsing int32 not finished
+func parse_fix_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
+	type_info = type_info[1:] // fix_array_start
+	json.WriteString("[")
+	leng := new(big.Int).SetBytes(type_info[:32]).Int64()
+	type_info = type_info[32:]
 
-    for i:=int64(0); i<leng; i++{
-        if i==leng-1 {
-            type_info, data = parse_type(type_info, data, json)
-        }else{
-            json.WriteString(", ")
-            _, data = parse_type(type_info, data, json)
-        }
-    }
+	for i := int64(0); i < leng; i++ {
+		if i == leng-1 {
+			type_info, data = parse_type(type_info, data, json)
+		} else {
+			json.WriteString(", ")
+			_, data = parse_type(type_info, data, json)
+		}
+	}
 
 	json.WriteString("]")
 	return type_info, data
 }
 
 // dynamic array
-func parse_dyn_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte){
-    panic(fmt.Sprintf("dynamic array not implemented yet!"))
-    return type_info, data
+func parse_dyn_array(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
+	panic(fmt.Sprintf("dynamic array not implemented yet!"))
 }
 
-func parse_struct(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte){
-    type_info = type_info[1:] // struct_start
-    json.WriteString("[")
-    for i:=0; ; i++{
-        t := type_info[0]
-        if 0<i { json.WriteString(", ") }
-        if t!=typecodes.STRUCT_END{
-            type_info, data = parse_type(type_info, data, json)
-        }
-    }
-    type_info = type_info[1:] // struct_end
-    json.WriteString("]")
-    return type_info, data
+func parse_struct(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
+	type_info = type_info[1:] // struct_start
+	json.WriteString("[")
+	for i := 0; 0 < len(type_info); i++ {
+		t := type_info[0]
+		if 0 < i {
+			json.WriteString(", ")
+		}
+		if t != typecodes.STRUCT_END {
+			type_info, data = parse_type(type_info, data, json)
+		}
+	}
+	if type_info[0] != typecodes.STRUCT_START {
+		panic("encoding error - expected struct_end token")
+	}
+	type_info = type_info[1:] // struct_end
+	json.WriteString("]")
+	return type_info, data
 }
 
 // bool, int
-func parse_value(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte){
-    t := type_info[0]
-    if t==typecodes.BOOL{
-        json.WriteString( fmt.Sprint(0!=data[0]) )
-    }else if typecodes.INT<=t && t<=typecodes.INT256{ // signed integer
-        n := new(big.Int)
-        var b [32] byte
-        copy(b[:], data[:typecodes.DataLen[t]])
-        if(b[0]>=128){ // negative value, two's complement
-            n.SetBytes(b[:])
-            n = n.Sub(n, big.NewInt(int64(1)))
-            copy(b[:], n.Bytes())
-            for i:=0; i<32; i++ {b[i] ^= 255}
-            n.SetBytes(b[:])
-            n = n.Mul(n, big.NewInt(int64(-1)))
-            json.WriteString(n.String())
-        }else{ // positive value
-            n.SetBytes(b[:])
-            json.WriteString(n.String())
-        }
-        
-    }else if (typecodes.UINT<=t && t<=typecodes.UINT256) || (typecodes.BYTE1<=t && t<=typecodes.BYTE32){// unsigned integer
-        n := new(big.Int)
-        n.SetBytes(data[:typecodes.DataLen[t]]) // big endian
-        json.WriteString(n.String())
-    }else{
-        panic(fmt.Sprintf("unkown or not implemented type: %d", t))
-    }
-    type_info = type_info[1:]
-    data = data[typecodes.DataLen[t]:]
-    return type_info, data
+func parse_value(type_info []byte, data []byte, json *bytes.Buffer) ([]byte, []byte) {
+	t := type_info[0]
+	if t == typecodes.BOOL {
+		var boolVal bool
+		for i := 0; i < 32; i++ {
+			if data[i] != 0 {
+				boolVal = true
+			}
+		}
+		json.WriteString(fmt.Sprint(boolVal))
+	} else if typecodes.IsSint(t) { // signed integer
+		n := new(big.Int)
+		var b [32]byte
+		copy(b[:], data[:32])
+		if b[0] >= 128 { // negative value, two's complement
+			n.SetBytes(b[:])
+			n = n.Sub(n, big.NewInt(int64(1)))
+			copy(b[:], n.Bytes())
+			for i := 0; i < 32; i++ {
+				b[i] ^= 255
+			}
+			n.SetBytes(b[:])
+			n = n.Mul(n, big.NewInt(int64(-1)))
+			json.WriteString(n.String())
+		} else { // positive value
+			n.SetBytes(b[:])
+			json.WriteString(n.String())
+		}
+
+	} else if typecodes.IsUint(t) { // unsigned integer
+		n := new(big.Int)
+		n.SetBytes(data[:32]) // big endian
+		json.WriteString(n.String())
+	} else {
+		panic(fmt.Sprintf("encoding error - unknown or not implemented type: %d", t))
+	}
+	type_info = type_info[1:]
+	data = data[32:]
+	return type_info, data
 }

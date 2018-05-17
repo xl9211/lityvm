@@ -906,6 +906,8 @@ func initENI(evm *EVM, stack *Stack, memory *Memory) error {
 	argsType := memory.Get(typeOffset+32, argsTypeLength)
 	argsData := memory.Get(dataOffset+32, argsDataLength)
 	argsText, err := arg_parser.Parse(argsType, argsData)
-	if err!=nil {return err}
+	if err != nil {
+		return err
+	}
 	return evm.eni.InitENI(funcName, argsText)
 }

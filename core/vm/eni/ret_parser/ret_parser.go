@@ -8,60 +8,60 @@ import "errors"
 
 import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
 
-func Parse(type_info []byte, jsonStr string) (ret []byte, err error) {
+func Parse(typeInfo []byte, jsonStr string) (ret []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("Return Parser Error: " + r.(string))
 		}
 	}()
 	json := []byte(jsonStr)
-	skip_ws(&json)
+	skipWS(&json)
 	expect(&json, '[')
 	var dataBuf bytes.Buffer
-	for i := 0; 0 < len(type_info); i++ {
+	for i := 0; 0 < len(typeInfo); i++ {
 		if 0 < i {
-			skip_ws(&json)
+			skipWS(&json)
 			expect(&json, ',')
 		}
-		type_info, json = parse_type(type_info, &dataBuf, []byte(json))
+		typeInfo, json = parseType(typeInfo, &dataBuf, []byte(json))
 	}
-	skip_ws(&json)
+	skipWS(&json)
 	expect(&json, ']')
 	return dataBuf.Bytes(), err
 }
 
 // assuming that data are packed
-func parse_type(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	t := type_info[0]
+func parseType(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	t := typeInfo[0]
 	if typecodes.ComplexType[t] {
 		if t == typecodes.FIX_ARRAY_START {
-			type_info, json = parse_fix_array(type_info, data, json)
+			typeInfo, json = parseFixArray(typeInfo, data, json)
 		} else if t == typecodes.DYN_ARRAY_START {
-			type_info, json = parse_dyn_array(type_info, data, json)
+			typeInfo, json = parseDynArray(typeInfo, data, json)
 		} else if t == typecodes.STRUCT_START {
-			type_info, json = parse_struct(type_info, data, json)
+			typeInfo, json = parseStruct(typeInfo, data, json)
 		} else if t == typecodes.STRING {
-			type_info, json = parse_string(type_info, data, json)
+			typeInfo, json = parseString(typeInfo, data, json)
 		}
 	} else { // value type
-		type_info, json = parse_value(type_info, data, json)
+		typeInfo, json = parseValue(typeInfo, data, json)
 	}
-	return type_info, json
+	return typeInfo, json
 }
 
-func parse_string(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	type_info = type_info[1:] // string
-	skip_ws(&json)
+func parseString(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	typeInfo = typeInfo[1:] // string
+	skipWS(&json)
 	expect(&json, '"')
 	length := int64(0)
 	var buf bytes.Buffer
-	for json[length] != '"' {
-		if json[length] == '\\' {
-			length++
-            buf.WriteByte(parse_escape(json[length:]))
-		}else{
-            buf.WriteByte(json[length])
-        }
+	for json[0] != '"' {
+		if json[0] == '\\' {
+			buf.WriteByte(parseEscape(&json))
+		} else {
+			buf.WriteByte(json[0])
+			json = json[1:]
+		}
 		length++
 	}
 
@@ -70,83 +70,83 @@ func parse_string(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []
 	if length%32 > 0 {
 		data.Write(make([]byte, 32-length))
 	}
-	json = json[length:]
 	expect(&json, '"')
-	return type_info, json
+	return typeInfo, json
 }
 
-func parse_dyn_array(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func parseDynArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	// TODO
-	return type_info, json
+	return typeInfo, json
 }
 
-// parsing int32 not finished
-func parse_fix_array(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	type_info = type_info[1:] // fix_array_start
-	skip_ws(&json)
+func parseFixArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	typeInfo = typeInfo[1:] // fix_array_start
+	skipWS(&json)
 	expect(&json, '[')
-	leng := new(big.Int).SetBytes(type_info[:32]).Int64()
-	type_info = type_info[32:]
+	leng := new(big.Int).SetBytes(typeInfo[:32]).Int64()
+	typeInfo = typeInfo[32:]
 
 	for i := int64(0); i < leng; i++ {
 		if i > 0 {
-			skip_ws(&json)
+			skipWS(&json)
 			expect(&json, ',')
 		}
 		if i == leng-1 {
-			type_info, json = parse_type(type_info, data, json)
+			typeInfo, json = parseType(typeInfo, data, json)
 		} else {
-			_, json = parse_type(type_info, data, json)
+			_, json = parseType(typeInfo, data, json)
 		}
 	}
 
-	skip_ws(&json)
+	skipWS(&json)
 	expect(&json, ']')
-	return type_info, json
+	return typeInfo, json
 }
 
-func parse_struct(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	skip_ws(&json)
+func parseStruct(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	skipWS(&json)
 	expect(&json, '[')
 	for i := 0; ; i++ {
-		t := type_info[0]
-		skip_ws(&json)
+		t := typeInfo[0]
+		skipWS(&json)
 		expect(&json, ',')
 		if t != typecodes.STRUCT_END {
-			type_info, json = parse_type(type_info, data, json)
+			typeInfo, json = parseType(typeInfo, data, json)
+			break
 		}
 	}
-	type_info = type_info[1:] // struct_end
-	skip_ws(&json)
+	typeInfo = typeInfo[1:] // struct_end
+	skipWS(&json)
 	expect(&json, ']')
-	return type_info, json
+	return typeInfo, json
 }
 
-func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	t := type_info[0]
-	skip_ws(&json)
+func parseValue(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	t := typeInfo[0]
+	skipWS(&json)
 	if t == typecodes.BOOL {
 		if have(&json, 't') {
 			expect(&json, 'r')
 			expect(&json, 'u')
 			expect(&json, 'e')
+			data.Write(make([]byte, 31, 31))
 			data.WriteByte(byte(1))
 		} else if have(&json, 'f') {
 			expect(&json, 'a')
 			expect(&json, 'l')
 			expect(&json, 's')
 			expect(&json, 'e')
-			data.WriteByte(byte(0))
+			data.Write(make([]byte, 32, 32))
 		} else { // err
 			panic(fmt.Sprintf("expected boolean, found '%c'", json[0]))
 		}
-	} else if typecodes.INT <= t && t <= typecodes.INT256 { // signed integer
+	} else if typecodes.IsSint(t) { // signed integer
 		i := 0
 		ojson := json
 		if have(&json, '-') {
 			i++
 		}
-		for have_digit(&json) {
+		for haveDigit(&json) {
 			i++
 		}
 		if i == 0 || (i == 1 && ojson[0] == '-') {
@@ -163,10 +163,10 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
 		n.Add(n, big.NewInt(int64(1)))
 		b = math.PaddedBigBytes(n, 32)
 		data.Write(b)
-	} else if (typecodes.UINT <= t && t <= typecodes.UINT256) || (typecodes.BYTE1 <= t && t <= typecodes.BYTE32) { // unsigned integer
+	} else if typecodes.IsUint(t) { // unsigned integer
 		i := 0
 		ojson := json
-		for have_digit(&json) {
+		for haveDigit(&json) {
 			i++
 		}
 		if i == 0 {
@@ -179,32 +179,47 @@ func parse_value(type_info []byte, data *bytes.Buffer, json []byte) ([]byte, []b
 	} else {
 		// TODO: unknown code
 	}
-	type_info = type_info[1:]
-	return type_info, json
+	typeInfo = typeInfo[1:]
+	return typeInfo, json
 }
 
-func parse_escape(json []byte) byte {
-    if json[1]=='\\' || json[1]=='"'{
-        return json[1]
-    }else if json[1]=='/'{
-        return '/'
-    }else if json[1]=='b'{
-        return '\b'
-    }else if json[1]=='f'{
-        return '\f'
-    }else if json[1]=='n'{
-        return '\n'
-    }else if json[1]=='r'{
-        return '\r'
-    }else if json[1]=='t'{
-        return '\t'
-    }else if json[1]=='u'{
-        //TODO: UTF-8
-        panic("UTF-8 not implemented yet!")
-    }else{
-        panic("invalid escape sequence")
-    }
+func parseEscape(json *[]byte) (ch byte) {
+	if (*json)[1] == '\\' || (*json)[1] == '"' {
+		ch = (*json)[1]
+	} else if (*json)[1] == '/' {
+		ch = '/'
+	} else if (*json)[1] == 'b' {
+		ch = '\b'
+	} else if (*json)[1] == 'f' {
+		ch = '\f'
+	} else if (*json)[1] == 'n' {
+		ch = '\n'
+	} else if (*json)[1] == 'r' {
+		ch = '\r'
+	} else if (*json)[1] == 't' {
+		ch = '\t'
+	} else if (*json)[1] == 'u' {
+		str := string((*json)[2:6])
+		var code int
+		fmt.Sscanf(str, "%x", &code)
+		if code < 128 {
+			ch = byte(code)
+		} else {
+			//TODO: UTF-8
+			panic("UTF-8 not implemented yet!")
+		}
+	} else {
+		panic("invalid escape sequence")
+	}
+
+	if (*json)[1] == 'u' {
+		(*json) = (*json)[6:]
+	} else {
+		(*json) = (*json)[2:]
+	}
+	return ch
 }
+
 func have(json *[]byte, c byte) bool {
 	if (*json)[0] == c {
 		*json = (*json)[1:]
@@ -214,7 +229,7 @@ func have(json *[]byte, c byte) bool {
 	}
 }
 
-func have_digit(json *[]byte) bool {
+func haveDigit(json *[]byte) bool {
 	if len(*json) > 0 && (*json)[0] >= '0' && (*json)[0] <= '9' {
 		*json = (*json)[1:]
 		return true
@@ -235,7 +250,7 @@ func expectMsg(json *[]byte, c byte, errMsg string) {
 	}
 }
 
-func skip_ws(json *[]byte) {
+func skipWS(json *[]byte) {
 	for 1 < len(*json) && ((*json)[0] == ' ' || (*json)[0] == '\t' || (*json)[0] == '\n' || (*json)[0] == '\r') {
 		*json = (*json)[1:]
 	}
