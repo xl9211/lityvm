@@ -10,7 +10,7 @@
 
 GOBIN = build/bin
 GO ?= latest
-CGO_LDFLAGS = -L$(HOME)/.ethereum/eni/lib -Wl,-rpath,$(HOME)/.ethereum/eni/lib
+CGO_LDFLAGS = -L$(HOME)/.travis/eni/lib -Wl,-rpath,$(HOME)/.travis/eni/lib
 
 geth:
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install ./cmd/geth
