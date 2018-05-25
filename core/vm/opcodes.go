@@ -194,6 +194,16 @@ const (
 	SWAP
 )
 
+// arithmetic with overflow(32-byte) checking
+const (
+	SADD OpCode = 0xc0 + iota
+	UADD
+	SSUB
+	USUB
+	SMUL
+	UMUL
+)
+
 const (
 	// 0xf0 range - closures
 	CREATE OpCode = 0xf0 + iota
@@ -201,7 +211,7 @@ const (
 	CALLCODE
 	RETURN
 	DELEGATECALL
-	ENI
+	ENI // Ethereum Native Interface
 
 	SELFDESTRUCT = 0xff
 )
@@ -362,6 +372,13 @@ var opCodeToString = map[OpCode]string{
 	PUSH: "PUSH",
 	DUP:  "DUP",
 	SWAP: "SWAP",
+
+	SADD: "SADD",
+	UADD: "UADD",
+	SSUB: "SSUB",
+	USUB: "USUB",
+	SMUL: "SMUL",
+	UMUL: "UMUL",
 }
 
 func (o OpCode) String() string {
@@ -505,6 +522,12 @@ var stringToOp = map[string]OpCode{
 	"CALLCODE":     CALLCODE,
 	"SELFDESTRUCT": SELFDESTRUCT,
 	"ENI":          ENI,
+	"SADD":         SADD,
+	"UADD":         UADD,
+	"SSUB":         SSUB,
+	"USUB":         USUB,
+	"SMUL":         SMUL,
+	"UMUL":         UMUL,
 }
 
 func StringToOp(str string) OpCode {

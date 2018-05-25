@@ -889,6 +889,42 @@ func NewFrontierInstructionSet() [256]operation {
 			init:          initENI,
 			valid:         true,
 		},
+		SADD: {
+			execute:       opSadd,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
+		UADD: {
+			execute:       opUadd,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
+		SSUB: {
+			execute:       opSsub,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
+		USUB: {
+			execute:       opUsub,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
+		SMUL: {
+			execute:       opSmul,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
+		UMUL: {
+			execute:       opUmul,
+			gasCost:       constGasFunc(GasFastestStep),
+			validateStack: makeStackFunc(2, 1),
+			valid:         true,
+		},
 	}
 }
 

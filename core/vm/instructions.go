@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -714,6 +715,69 @@ func opSuicide(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *
 	evm.StateDB.Suicide(contract.Address())
 
 	return nil, nil
+}
+
+func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	x, y := stack.pop(), stack.pop()
+	z := big.NewInt(0)
+	z.Add(x, y)
+
+	bz := math.PaddedBigBytes(z, 32)
+	bz = bz[len(bz)-32 : len(bz)]
+	z.SetBytes(bz)
+
+	x = math.S256(x)
+	y = math.S256(y)
+	z = math.S256(z)
+
+	if z.Sign() > 0 && x.Sign() < 0 && y.Sign() < 0 {
+		return nil, errors.New("SADD overflow")
+	} else if z.Sign() < 0 && x.Sign() > 0 && y.Sign() > 0 {
+		return nil, errors.New("SADD overflow")
+	}
+
+	stack.push(math.U256(z))
+
+	evm.interpreter.intPool.put(y)
+
+	return nil, nil
+}
+
+func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	x, y := stack.pop(), stack.pop()
+	z := big.NewInt(0)
+	z.Add(x, y)
+
+	bz := math.PaddedBigBytes(z, 32)
+	if len(bz) > 32 {
+		return nil, errors.New("UADD overflow")
+	}
+
+	stack.push(math.U256(z))
+
+	evm.interpreter.intPool.put(y)
+
+	return nil, nil
+}
+
+func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	// TODO
+	return nil, errors.New("SSUB overflow")
+}
+
+func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	// TODO
+	return nil, errors.New("USUB overflow")
+}
+
+func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	// TODO
+	return nil, errors.New("SMUL overflow")
+}
+
+func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	// TODO
+	return nil, errors.New("UMUL overflow")
 }
 
 // following functions are used by the instruction jump  table
