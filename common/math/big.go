@@ -23,12 +23,15 @@ import (
 )
 
 var (
-	tt255     = BigPow(2, 255)
-	tt256     = BigPow(2, 256)
-	tt256m1   = new(big.Int).Sub(tt256, big.NewInt(1))
-	MaxBig256 = new(big.Int).Set(tt256m1)
-	tt63      = BigPow(2, 63)
-	MaxBig63  = new(big.Int).Sub(tt63, big.NewInt(1))
+	tt255          = BigPow(2, 255)
+	tt256          = BigPow(2, 256)
+	tt256m1        = new(big.Int).Sub(tt256, big.NewInt(1))
+	MaxBig256      = new(big.Int).Set(tt256m1)
+	tt63           = BigPow(2, 63)
+	MaxBig63       = new(big.Int).Sub(tt63, big.NewInt(1))
+	U256UpperBound = new(big.Int).Add(big.NewInt(-1), BigPow(2, 256)) // 2^256-1
+	S256UpperBound = new(big.Int).Add(big.NewInt(-1), BigPow(2, 255)) // 2^255-1
+	S256LowerBound = new(big.Int).Sub(big.NewInt(0), BigPow(2, 255))  // -2^255
 )
 
 const (
@@ -176,6 +179,17 @@ func U256(x *big.Int) *big.Int {
 	return x.And(x, tt256m1)
 }
 
+// SignAbsTo256Twos converts a sign-and-absolute-value number to a 256 bit two's complement number.
+// x must be -2^256 ~ 2^256-1, otherwise undefined behavior
+// This operation is destructive.
+func SignAbsTo256Twos(x *big.Int) *big.Int {
+	if x.Sign() >= 0 {
+		return x
+	} else {
+		return new(big.Int).Add(x, tt256)
+	}
+}
+
 // S256 interprets x as a two's complement number.
 // x must not exceed 256 bits (the result is undefined if it does) and is not modified.
 //
@@ -189,6 +203,14 @@ func S256(x *big.Int) *big.Int {
 	} else {
 		return new(big.Int).Sub(x, tt256)
 	}
+}
+
+func InU256(x *big.Int) bool {
+	return x.Cmp(U256UpperBound) <= 0
+}
+
+func InS256(x *big.Int) bool {
+	return x.Cmp(S256LowerBound) >= 0 && x.Cmp(S256UpperBound) <= 0
 }
 
 // Exp implements exponentiation by squaring.

@@ -719,27 +719,18 @@ func opSuicide(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *
 
 func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
-	z := big.NewInt(0)
-	z.Add(x, y)
-
-	bz := math.PaddedBigBytes(z, 32)
-	bz = bz[len(bz)-32:]
-	z.SetBytes(bz)
-
 	x = math.S256(x)
 	y = math.S256(y)
-	z = math.S256(z)
 
-	if z.Sign() > 0 && x.Sign() < 0 && y.Sign() < 0 {
-		return nil, errors.New("SADD overflow")
-	} else if z.Sign() < 0 && x.Sign() > 0 && y.Sign() > 0 {
+	z := big.NewInt(0)
+	z.Add(x, y)
+	if !math.InS256(z) {
 		return nil, errors.New("SADD overflow")
 	}
 
-	stack.push(math.U256(z))
+	stack.push(math.SignAbsTo256Twos(z))
 
 	evm.interpreter.intPool.put(y)
-
 	return nil, nil
 }
 
@@ -748,8 +739,7 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	z := big.NewInt(0)
 	z.Add(x, y)
 
-	bz := z.Bytes()
-	if len(bz) > 32 {
+	if !math.InU256(z) {
 		return nil, errors.New("UADD overflow")
 	}
 
@@ -762,21 +752,28 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 
 func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
+	x = math.S256(x)
+	y = math.S256(y)
+
+	z := big.NewInt(0)
+	z.Sub(x, y)
+	if !math.InS256(z) {
+		return nil, errors.New("SMUL overflow")
+	}
+
+	stack.push(math.SignAbsTo256Twos(z))
+
+	evm.interpreter.intPool.put(y)
+	return nil, nil
+}
+
+func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	x, y := stack.pop(), stack.pop()
 	z := big.NewInt(0)
 	z.Sub(x, y)
 
-	bz := math.PaddedBigBytes(z, 32)
-	bz = bz[len(bz)-32:]
-	z.SetBytes(bz)
-
-	x = math.S256(x)
-	y = math.S256(y)
-	z = math.S256(z)
-
-	if z.Sign() > 0 && x.Sign() < 0 && y.Sign() > 0 {
-		return nil, errors.New("SSUB overflow")
-	} else if z.Sign() < 0 && x.Sign() > 0 && y.Sign() < 0 {
-		return nil, errors.New("SSUB overflow")
+	if !math.InU256(z) {
+		return nil, errors.New("USUB overflow")
 	}
 
 	stack.push(math.U256(z))
@@ -786,21 +783,21 @@ func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
-func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	x, y := stack.pop(), stack.pop()
-
-	if x.Cmp(y) < 0 {
-		return nil, errors.New("USUB overflow")
-	}
-	z := big.NewInt(0)
-	z.Add(x, y)
-
-	return nil, nil
-}
-
 func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// TODO
-	return nil, errors.New("SMUL overflow")
+	x, y := stack.pop(), stack.pop()
+	x = math.S256(x)
+	y = math.S256(y)
+
+	z := big.NewInt(0)
+	z.Mul(x, y)
+	if !math.InS256(z) {
+		return nil, errors.New("SMUL overflow")
+	}
+
+	stack.push(math.SignAbsTo256Twos(z))
+
+	evm.interpreter.intPool.put(y)
+	return nil, nil
 }
 
 func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
@@ -808,8 +805,7 @@ func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	z := big.NewInt(0)
 	z.Mul(x, y)
 
-	bz := z.Bytes()
-	if len(bz) > 32 {
+	if !math.InU256(z) {
 		return nil, errors.New("UMUL overflow")
 	}
 
