@@ -723,7 +723,7 @@ func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	z.Add(x, y)
 
 	bz := math.PaddedBigBytes(z, 32)
-	bz = bz[len(bz)-32 : len(bz)]
+	bz = bz[len(bz)-32:]
 	z.SetBytes(bz)
 
 	x = math.S256(x)
@@ -748,7 +748,7 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	z := big.NewInt(0)
 	z.Add(x, y)
 
-	bz := math.PaddedBigBytes(z, 32)
+	bz := z.Bytes()
 	if len(bz) > 32 {
 		return nil, errors.New("UADD overflow")
 	}
@@ -761,13 +761,41 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 }
 
 func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// TODO
-	return nil, errors.New("SSUB overflow")
+	x, y := stack.pop(), stack.pop()
+	z := big.NewInt(0)
+	z.Sub(x, y)
+
+	bz := math.PaddedBigBytes(z, 32)
+	bz = bz[len(bz)-32:]
+	z.SetBytes(bz)
+
+	x = math.S256(x)
+	y = math.S256(y)
+	z = math.S256(z)
+
+	if z.Sign() > 0 && x.Sign() < 0 && y.Sign() > 0 {
+		return nil, errors.New("SSUB overflow")
+	} else if z.Sign() < 0 && x.Sign() > 0 && y.Sign() < 0 {
+		return nil, errors.New("SSUB overflow")
+	}
+
+	stack.push(math.U256(z))
+
+	evm.interpreter.intPool.put(y)
+
+	return nil, nil
 }
 
 func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// TODO
-	return nil, errors.New("USUB overflow")
+	x, y := stack.pop(), stack.pop()
+
+	if x.Cmp(y) < 0 {
+		return nil, errors.New("USUB overflow")
+	}
+	z := big.NewInt(0)
+	z.Add(x, y)
+
+	return nil, nil
 }
 
 func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
@@ -776,7 +804,19 @@ func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 }
 
 func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// TODO
+	x, y := stack.pop(), stack.pop()
+	z := big.NewInt(0)
+	z.Mul(x, y)
+
+	bz := z.Bytes()
+	if len(bz) > 32 {
+		return nil, errors.New("UMUL overflow")
+	}
+
+	stack.push(math.U256(z))
+
+	evm.interpreter.intPool.put(y)
+
 	return nil, errors.New("UMUL overflow")
 }
 
