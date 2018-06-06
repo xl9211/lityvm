@@ -68,7 +68,7 @@ func parseString(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []by
 	data.Write(math.PaddedBigBytes(big.NewInt(length), 32))
 	data.Write(buf.Bytes())
 	if length%32 > 0 {
-		data.Write(make([]byte, 32-length))
+		data.Write(make([]byte, 32-length%32))
 	}
 	expect(&json, '"')
 	return typeInfo, json
