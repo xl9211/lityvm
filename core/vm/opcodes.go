@@ -49,6 +49,9 @@ const (
 	MULMOD
 	EXP
 	SIGNEXTEND
+	SADD
+	SSUB
+	SMUL
 )
 
 const (
@@ -192,16 +195,6 @@ const (
 	PUSH OpCode = 0xb0 + iota
 	DUP
 	SWAP
-)
-
-// arithmetic with overflow(32-byte) checking
-const (
-	SADD OpCode = 0xc0 + iota
-	UADD
-	SSUB
-	USUB
-	SMUL
-	UMUL
 )
 
 const (
@@ -374,11 +367,8 @@ var opCodeToString = map[OpCode]string{
 	SWAP: "SWAP",
 
 	SADD: "SADD",
-	UADD: "UADD",
 	SSUB: "SSUB",
-	USUB: "USUB",
 	SMUL: "SMUL",
-	UMUL: "UMUL",
 }
 
 func (o OpCode) String() string {
@@ -523,11 +513,8 @@ var stringToOp = map[string]OpCode{
 	"SELFDESTRUCT": SELFDESTRUCT,
 	"ENI":          ENI,
 	"SADD":         SADD,
-	"UADD":         UADD,
 	"SSUB":         SSUB,
-	"USUB":         USUB,
 	"SMUL":         SMUL,
-	"UMUL":         UMUL,
 }
 
 func StringToOp(str string) OpCode {
