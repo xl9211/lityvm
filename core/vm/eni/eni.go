@@ -1,36 +1,20 @@
 package eni
 
 /*
+#cgo LDFLAGS: -ldl
 #include <dlfcn.h>
 #include <stdint.h>
 #include <stdlib.h>
-#cgo LDFLAGS: -ldl -leni
+#include <stdio.h>
+#include "fork_call.h"
 
-typedef void* eni_create_t(char* pArgStr);
-typedef void  eni_destroy_t(void* pFunctor);
-
-extern uint64_t eni_gas(void* pFunctor);
-extern char* eni_run(void *pFunctor);
-
-void* functor;
-
-void set_functor(void* f) {
-  functor = f;
-}
-
-void eni_create(eni_create_t* f, char *data) {
-  functor = f(data);
-}
-
-void eni_destroy(eni_destroy_t* f) {
-  f(functor);
-}
 */
 import "C"
 
 import (
 	"debug/elf"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,77 +26,69 @@ import (
 type ENI struct {
 	// functions & dynamic libraries mapping used by ENI
 	functions map[string]string
-	// native functions for create & destroy functor
-	create  unsafe.Pointer
-	destroy unsafe.Pointer
+	opName    string
+	gasFunc   unsafe.Pointer
+	runFunc   unsafe.Pointer
+	argsText  string // JSON
+	retText   string // JSON
 }
 
 func NewENI() *ENI {
 	return &ENI{}
 }
 
-func (eni *ENI) InitENI(eniFunction string, data string) error {
+func (eni *ENI) InitENI(eniFunction string, argsText string) (err error) {
 	// Get functions & dynamic libraries mappings
-	functions, err := getEniFunctions()
+	eni.functions, err = getEniFunctions()
 	if err != nil {
 		return err
 	}
-	eni.functions = functions
 
-	// Check If function exists.
-	dynamicLib := make(map[string]string)
-	var ok bool
-	dynamicLib["create"], ok = eni.functions[eniFunction+"_create"]
-	if !ok {
-		return errors.New("create function not exists: " + eniFunction)
-	}
-	dynamicLib["destroy"], ok = eni.functions[eniFunction+"_destroy"]
-	if !ok {
-		return errors.New("destroy function not exists: " + eniFunction)
-	}
-
-	// Check create & destroy method in the same dynamic library
-	if dynamicLib["create"] != dynamicLib["destroy"] {
-		return errors.New("create and destroy method are not in the same dynamic library")
-	}
-	dynamicLibName := dynamicLib["create"]
-
+	dynamicLibName := eni.functions[eniFunction+"_gas"]
 	// Load dynamic library.
 	handler := C.dlopen(C.CString(dynamicLibName), C.RTLD_LAZY)
 	if handler == nil {
-		return errors.New("dlopen failed: " + dynamicLibName)
+		return errors.New("dlopen failed: " + dynamicLibName + "\nError: " + C.GoString(C.dlerror()))
 	}
 
-	// Prepare create & destroy functions.
-	eni.create = C.dlsym(handler, C.CString(eniFunction+"_create"))
-	if eni.create == nil {
-		return errors.New("dlsym failed: " + eniFunction + "_create")
+	eni.gasFunc = C.dlsym(handler, C.CString(eniFunction+"_gas"))
+	if eni.gasFunc == nil {
+		return errors.New("dlsym failed: " + eniFunction + "_gas")
 	}
-	eni.destroy = C.dlsym(handler, C.CString(eniFunction+"_destroy"))
-	if eni.destroy == nil {
-		return errors.New("dlsym failed: " + eniFunction + "_destroy")
+	eni.runFunc = C.dlsym(handler, C.CString(eniFunction+"_run"))
+	if eni.runFunc == nil {
+		return errors.New("dlsym failed: " + eniFunction + "_run")
 	}
-
-	// Create functor.
-	C.eni_create((*C.eni_create_t)(eni.create), C.CString(data))
+	eni.opName = eniFunction
+	eni.argsText = argsText
 
 	return nil
 }
 
+// Gas returns gas of current ENI operation
+// a process is forked to achieve fault tolerance
 func (eni *ENI) Gas() (uint64, error) {
-	return uint64(C.eni_gas(C.functor)), nil
+	status := C.int(87)
+	gas := uint64(C.fork_gas(eni.gasFunc, C.CString(eni.argsText), &status))
+	if int(status) != 0 {
+		return gas, errors.New("ENI " + eni.opName + " gas error" + ", status=" + fmt.Sprintf("%d", int(status)))
+	}
+	return gas, nil
 }
 
+// ExecuteENI executes current ENI operation
+// a process is forked to achieve fault tolerance
 func (eni *ENI) ExecuteENI() (string, error) {
 	// Run ENI function.
-	outputCString := C.eni_run(C.functor)
-	outputGoString := C.GoString(outputCString)
-	defer C.free(unsafe.Pointer(outputCString))
+	status := C.int(87)
+	retCString := C.fork_run(eni.runFunc, C.CString(eni.argsText), &status)
+	defer C.free(unsafe.Pointer(retCString))
+	retGoString := C.GoString(retCString)
 
-	// Destroy functor.
-	C.eni_destroy((*C.eni_destroy_t)(eni.destroy))
-
-	return outputGoString, nil
+	if int(status) != 0 {
+		return retGoString, errors.New("ENI " + eni.opName + " run error" + ", status=" + fmt.Sprintf("%d", int(status)))
+	}
+	return retGoString, nil
 }
 
 func getEniFunctions() (map[string]string, error) {

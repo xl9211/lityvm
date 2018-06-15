@@ -717,6 +717,7 @@ func opSuicide(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *
 	return nil, nil
 }
 
+// Signed add with overflow checking
 func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	x = math.S256(x)
@@ -734,6 +735,7 @@ func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
+// Unsigned add with overflow checking
 func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	z := big.NewInt(0)
@@ -750,6 +752,7 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
+// Signed sub with overflow checking
 func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	x = math.S256(x)
@@ -767,6 +770,7 @@ func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
+// Unsigned sub with overflow checking
 func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	z := big.NewInt(0)
@@ -783,6 +787,7 @@ func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
+// Signed mul with overflow checking
 func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	x = math.S256(x)
@@ -800,6 +805,7 @@ func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	return nil, nil
 }
 
+// Unsigned mul with overflow checking
 func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	x, y := stack.pop(), stack.pop()
 	z := big.NewInt(0)
