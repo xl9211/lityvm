@@ -6,6 +6,7 @@
 // struct: struct_start type+ struct_end
 
 // TODO: bytes
+
 package arg_parser
 
 import "math/big"
@@ -22,19 +23,17 @@ func Parse(typeInfo []byte, data []byte) (ret string, err error) {
 		}
 	}()
 	var json bytes.Buffer
-	parseEntryPoint(typeInfo, data, &json)
-	return json.String(), err
-}
 
-func parseEntryPoint(typeInfo []byte, data []byte, json *bytes.Buffer) {
 	json.WriteString("[")
 	for i := 0; 0 < len(typeInfo); i++ {
 		if 0 < i {
 			json.WriteString(",")
 		}
-		typeInfo, data = parseType(typeInfo, data, json)
+		typeInfo, data = parseType(typeInfo, data, &json)
 	}
 	json.WriteString("]")
+
+	return json.String(), err
 }
 
 // assuming that data are packed
@@ -156,7 +155,6 @@ func parseValue(typeInfo []byte, data []byte, json *bytes.Buffer) ([]byte, []byt
 			n.SetBytes(b[:])
 			json.WriteString(n.String())
 		}
-
 	} else if typecodes.IsUint(t) { // unsigned integer
 		n := new(big.Int)
 		n.SetBytes(data[:32]) // big endian
