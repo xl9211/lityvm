@@ -41,6 +41,119 @@ func TestByteOp(t *testing.T) {
 		}
 	}
 }
+func TestSadd(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+	)
+	a.SetString("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err := opSadd(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Sadd should overflow")
+	}
+	a.SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err = opSadd(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Sadd should not overflow")
+	}
+}
+
+func TestUadd(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+	)
+	a.SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err := opUadd(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Uadd should overflow")
+	}
+
+	a.SetString("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err = opUadd(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Uadd should not overflow")
+	}
+}
+
+func TestSsub(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+		b     = big.NewInt(0)
+	)
+	a.SetString("0000000000000000000000000000000000000000000000000000000000000001", 16)
+	stack.push(a)
+	b.SetString("8000000000000000000000000000000000000000000000000000000000000000", 16)
+	stack.push(b)
+	_, err := opSsub(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Ssub should overflow")
+	}
+}
+func TestUsub(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+		b     = big.NewInt(0)
+	)
+	a.SetString("1", 16)
+	stack.push(a)
+	b.SetString("0", 16)
+	stack.push(b)
+	_, err := opUsub(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Usub should overflow")
+	}
+}
+
+func TestSmul(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+	)
+	a.SetString("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err := opSmul(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Smul should overflow")
+	}
+}
+
+func TestUmul(t *testing.T) {
+	var (
+		env   = NewEVM(Context{}, nil, params.TestChainConfig, Config{EnableJit: false, ForceJit: false})
+		stack = newstack()
+		pc    = uint64(0)
+		a     = big.NewInt(0)
+	)
+	a.SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err := opUmul(&pc, env, nil, nil, stack)
+	if err == nil {
+		t.Errorf("Umul should overflow")
+	}
+}
 
 func opBenchmark(bench *testing.B, op func(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error), args ...string) {
 	var (

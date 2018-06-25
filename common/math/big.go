@@ -206,7 +206,7 @@ func S256(x *big.Int) *big.Int {
 }
 
 func InU256(x *big.Int) bool {
-	return x.Cmp(U256UpperBound) <= 0
+	return x.Cmp(U256UpperBound) <= 0 && x.Sign() >= 0
 }
 
 func InS256(x *big.Int) bool {

@@ -767,7 +767,7 @@ func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	z := big.NewInt(0)
 	z.Sub(x, y)
 	if !math.InS256(z) {
-		return nil, errors.New("SMUL overflow")
+		return nil, errors.New("SSUB overflow")
 	}
 
 	stack.push(math.SignAbsTo256Twos(z))
