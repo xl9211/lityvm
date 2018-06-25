@@ -1,6 +1,5 @@
 package arg_parser
 
-import "bytes"
 import "fmt"
 
 import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
@@ -16,14 +15,13 @@ func printOrError(json string, err error) {
 // single positive integer (big endian)
 func ExampleParse_posInt() {
 	var f, d []byte
-	var buf bytes.Buffer
 
 	f = make([]byte, 1, 1)
 	d = make([]byte, 70, 70)
 	f[0] = typecodes.INT
 	d[31] = uint8(72) // 32-byte big endian
-	parse_entry_point(f, d, &buf)
-	fmt.Println(buf.String())
+	json, err := Parse(f, d)
+	printOrError(json, err)
 	// Output: [72]
 }
 
@@ -78,37 +76,31 @@ func ExampleParse_bool() {
 
 // a int and a bool
 func ExampleParse_intBool() {
-	var buf bytes.Buffer
-
 	f := [2]byte{typecodes.INT, typecodes.BOOL}
 	var d [70]byte
 	d[31] = uint8(72) // 32-byte big endian
-	parse_entry_point(f[:], d[:], &buf)
-	fmt.Println(buf.String())
+	json, err := Parse(f[:], d[:])
+	printOrError(json, err)
 
 	// Output: [72,false]
 }
 
 // a negative int
 func ExampleParse_negInt() {
-	var buf bytes.Buffer
-
 	f := [1]byte{typecodes.INT}
 	var d [70]byte
 	for i := 0; i < 32; i++ {
 		d[i] = uint8(255)
 	}
 
-	parse_entry_point(f[:], d[:], &buf)
-	fmt.Println(buf.String())
+	json, err := Parse(f[:], d[:])
 
+	printOrError(json, err)
 	// Output: [-1]
 }
 
 // two strings
 func ExampleParse_string() {
-	var buf bytes.Buffer
-
 	f := [2]byte{typecodes.STRING, typecodes.STRING}
 	var d [160]byte
 	d[31] = uint8(3) // 32-byte big endian
@@ -118,9 +110,9 @@ func ExampleParse_string() {
 	strB := "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
 	copy(d[96:], []byte(strB))
 
-	parse_entry_point(f[:], d[:], &buf)
-	fmt.Println(buf.String())
+	json, err := Parse(f[:], d[:])
 
+	printOrError(json, err)
 	// Output: ["abc","abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx"]
 }
 
