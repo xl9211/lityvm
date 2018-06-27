@@ -11,24 +11,25 @@
 GOBIN = build/bin
 GO ?= latest
 CGO_LDFLAGS = -L$(HOME)/.travis/eni/lib -Wl,-rpath,$(HOME)/.travis/eni/lib
+CGO_LDFLAGS_ALLOW = "-I.*"
 
 geth:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install ./cmd/geth
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_LDFLAGS_ALLOW="$(CGO_LDFLAGS_ALLOW)" build/env.sh go run build/ci.go install ./cmd/geth
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
 swarm:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install ./cmd/swarm
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_LDFLAGS_ALLOW="$(CGO_LDFLAGS_ALLOW)" build/env.sh go run build/ci.go install ./cmd/swarm
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/swarm\" to launch swarm."
 
 evm:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install ./cmd/evm
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_LDFLAGS_ALLOW="$(CGO_LDFLAGS_ALLOW)" build/env.sh go run build/ci.go install ./cmd/evm
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/evm\" to start the evm."
 
 all:
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" build/env.sh go run build/ci.go install
+	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_LDFLAGS_ALLOW="$(CGO_LDFLAGS_ALLOW)" build/env.sh go run build/ci.go install
 
 android:
 	build/env.sh go run build/ci.go aar --local
