@@ -62,11 +62,7 @@ func ExampleConvertReturnValue_fixArray() {
 	f[33] = INT
 	d, err := ConvertReturnValue(f[:], "[[-123]]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: [255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 133]
 }
 
@@ -74,11 +70,7 @@ func ExampleConvertReturnValue_error1() {
 	f := [1]byte{INT}
 	d, err := ConvertReturnValue(f[:], "-123")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected '[', found '-'
 }
 
@@ -86,11 +78,7 @@ func ExampleConvertReturnValue_error2() {
 	f := [1]byte{UINT}
 	d, err := ConvertReturnValue(f[:], "[-123]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected uint, found '-'
 }
 
@@ -98,11 +86,7 @@ func ExampleConvertReturnValue_error3() {
 	f := [1]byte{STRING}
 	d, err := ConvertReturnValue(f[:], "[-123]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected '"', found '-'
 }
 
@@ -110,19 +94,11 @@ func ExampleConvertReturnValue_errorInt() {
 	f := [1]byte{INT}
 	d, err := ConvertReturnValue(f[:], "[-]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	f = [1]byte{UINT}
 	d, err = ConvertReturnValue(f[:], "[-123]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected int, found '-'
 	// Return Parser Error: expected uint, found '-'
 }
@@ -131,19 +107,11 @@ func ExampleConvertReturnValue_errorBool() {
 	f := [1]byte{BOOL}
 	d, err := ConvertReturnValue(f[:], "[tree]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	f = [1]byte{BOOL}
 	d, err = ConvertReturnValue(f[:], "[jizz]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected 'u', found 'e'
 	// Return Parser Error: expected boolean, found 'j'
 }
@@ -155,11 +123,7 @@ func ExampleConvertReturnValue_errorFixArray() {
 	f[33] = INT
 	d, err := ConvertReturnValue(f[:], "[[-123, 7122, a, 45]]")
 
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Printf("%v\n", d)
-	}
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: expected int, found 'a'
 }
 

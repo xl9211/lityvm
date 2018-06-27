@@ -81,6 +81,7 @@ func (cvt *retConverter) parseString(typeInfo []byte, data *bytes.Buffer, json [
 
 func (cvt *retConverter) parseDynArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	// TODO
+	panic("dynamic array not implemented yet!")
 	return typeInfo, json
 }
 
@@ -182,7 +183,7 @@ func (cvt *retConverter) parseValue(typeInfo []byte, data *bytes.Buffer, json []
 		b := math.PaddedBigBytes(&n, 32)
 		data.Write(b)
 	} else {
-		// TODO: unknown code
+		panic(fmt.Sprintf("encoding error - unknown or not implemented type: %d", t))
 	}
 	typeInfo = typeInfo[1:]
 	return typeInfo, json
