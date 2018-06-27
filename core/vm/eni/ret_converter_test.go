@@ -1,9 +1,10 @@
-package ret_parser
+package eni
 
-import "fmt"
-import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
+import (
+	"fmt"
+)
 
-func printOrError(d []byte, err error) {
+func retPrintOrError(d []byte, err error) {
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -11,55 +12,55 @@ func printOrError(d []byte, err error) {
 	}
 }
 
-func ExampleParse_negInt() {
-	f := [1]byte{typecodes.INT}
-	d, _ := Parse(f[:], "[-123]")
+func ExampleConvertReturnValue_negInt() {
+	f := [1]byte{INT}
+	d, _ := ConvertReturnValue(f[:], "[-123]")
 
 	fmt.Printf("%v\n", d)
 	// Output: [255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 133]
 }
 
-func ExampleParse_string() {
-	f := [1]byte{typecodes.STRING}
-	d, _ := Parse(f[:], "[\"-123abc1\"]")
+func ExampleConvertReturnValue_string() {
+	f := [1]byte{STRING}
+	d, _ := ConvertReturnValue(f[:], "[\"-123abc1\"]")
 
 	fmt.Printf("%v\n", d)
 	// Output: [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 45 49 50 51 97 98 99 49 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
 }
 
-func ExampleParse_escapedString() {
-	f := [1]byte{typecodes.STRING}
+func ExampleConvertReturnValue_escapedString() {
+	f := [1]byte{STRING}
 	json := "[\"-123\\\"\"]"
-	d, err := Parse(f[:], json)
+	d, err := ConvertReturnValue(f[:], json)
 
-	printOrError(d, err)
+	retPrintOrError(d, err)
 	// Output: [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 45 49 50 51 34 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
 }
 
-func ExampleParse_controlEscapedString() {
-	f := [1]byte{typecodes.STRING}
+func ExampleConvertReturnValue_controlEscapedString() {
+	f := [1]byte{STRING}
 	json := "[\"-123\\\"\\n\\u0010\"]"
-	d, err := Parse(f[:], json)
+	d, err := ConvertReturnValue(f[:], json)
 
-	printOrError(d, err)
+	retPrintOrError(d, err)
 	// Output: [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7 45 49 50 51 34 10 16 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
 }
 
-func ExampleParse_unicodeEscapedString() {
-	f := [1]byte{typecodes.STRING}
+func ExampleConvertReturnValue_unicodeEscapedString() {
+	f := [1]byte{STRING}
 	json := "[\"-123\\\"\\n\\u7122\"]"
-	d, err := Parse(f[:], json)
+	d, err := ConvertReturnValue(f[:], json)
 
-	printOrError(d, err)
+	retPrintOrError(d, err)
 	// Output: Return Parser Error: UTF-8 not implemented yet!
 }
 
-func ExampleParse_fixArray() {
+func ExampleConvertReturnValue_fixArray() {
 	var f [34]byte
-	f[0] = typecodes.FIX_ARRAY_START
+	f[0] = FIX_ARRAY_START
 	f[32] = 1
-	f[33] = typecodes.INT
-	d, err := Parse(f[:], "[[-123]]")
+	f[33] = INT
+	d, err := ConvertReturnValue(f[:], "[[-123]]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -69,9 +70,9 @@ func ExampleParse_fixArray() {
 	// Output: [255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 133]
 }
 
-func ExampleParse_error1() {
-	f := [1]byte{typecodes.INT}
-	d, err := Parse(f[:], "-123")
+func ExampleConvertReturnValue_error1() {
+	f := [1]byte{INT}
+	d, err := ConvertReturnValue(f[:], "-123")
 
 	if err != nil {
 		fmt.Println(err)
@@ -81,9 +82,9 @@ func ExampleParse_error1() {
 	// Output: Return Parser Error: expected '[', found '-'
 }
 
-func ExampleParse_error2() {
-	f := [1]byte{typecodes.UINT}
-	d, err := Parse(f[:], "[-123]")
+func ExampleConvertReturnValue_error2() {
+	f := [1]byte{UINT}
+	d, err := ConvertReturnValue(f[:], "[-123]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -93,9 +94,9 @@ func ExampleParse_error2() {
 	// Output: Return Parser Error: expected uint, found '-'
 }
 
-func ExampleParse_error3() {
-	f := [1]byte{typecodes.STRING}
-	d, err := Parse(f[:], "[-123]")
+func ExampleConvertReturnValue_error3() {
+	f := [1]byte{STRING}
+	d, err := ConvertReturnValue(f[:], "[-123]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -105,17 +106,17 @@ func ExampleParse_error3() {
 	// Output: Return Parser Error: expected '"', found '-'
 }
 
-func ExampleParse_errorInt() {
-	f := [1]byte{typecodes.INT}
-	d, err := Parse(f[:], "[-]")
+func ExampleConvertReturnValue_errorInt() {
+	f := [1]byte{INT}
+	d, err := ConvertReturnValue(f[:], "[-]")
 
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		fmt.Printf("%v\n", d)
 	}
-	f = [1]byte{typecodes.UINT}
-	d, err = Parse(f[:], "[-123]")
+	f = [1]byte{UINT}
+	d, err = ConvertReturnValue(f[:], "[-123]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -126,17 +127,17 @@ func ExampleParse_errorInt() {
 	// Return Parser Error: expected uint, found '-'
 }
 
-func ExampleParse_errorBool() {
-	f := [1]byte{typecodes.BOOL}
-	d, err := Parse(f[:], "[tree]")
+func ExampleConvertReturnValue_errorBool() {
+	f := [1]byte{BOOL}
+	d, err := ConvertReturnValue(f[:], "[tree]")
 
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		fmt.Printf("%v\n", d)
 	}
-	f = [1]byte{typecodes.BOOL}
-	d, err = Parse(f[:], "[jizz]")
+	f = [1]byte{BOOL}
+	d, err = ConvertReturnValue(f[:], "[jizz]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -147,12 +148,12 @@ func ExampleParse_errorBool() {
 	// Return Parser Error: expected boolean, found 'j'
 }
 
-func ExampleParse_errorFixArray() {
+func ExampleConvertReturnValue_errorFixArray() {
 	var f [34]byte
-	f[0] = typecodes.FIX_ARRAY_START
+	f[0] = FIX_ARRAY_START
 	f[32] = 4
-	f[33] = typecodes.INT
-	d, err := Parse(f[:], "[[-123, 7122, a, 45]]")
+	f[33] = INT
+	d, err := ConvertReturnValue(f[:], "[[-123, 7122, a, 45]]")
 
 	if err != nil {
 		fmt.Println(err)
@@ -163,18 +164,18 @@ func ExampleParse_errorFixArray() {
 }
 
 // Json not matched with ENI type encoding
-func ExampleParse_errorEcodingJsonMismatch() {
+func ExampleConvertReturnValue_errorEcodingJsonMismatch() {
 	// TODO:
 }
 
 // JSON format error
 // This happens when libeni returns wrong JSON
-func ExampleParse_errorJsonFormat1() {
+func ExampleConvertReturnValue_errorJsonFormat1() {
 	// TODO:
 }
 
 // JSON integer error
 // This happens when libeni returns any too large integers
-func ExampleParse_errorJsonFormat2() {
+func ExampleConvertReturnValue_errorJsonFormat2() {
 	// TODO:
 }

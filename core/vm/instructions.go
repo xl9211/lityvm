@@ -24,7 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm/eni/ret_parser"
+	"github.com/ethereum/go-ethereum/core/vm/eni"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -682,7 +682,7 @@ func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stac
 	}
 	retTypeLength := new(big.Int).SetBytes(memory.Get(retTypeOffset, 32)).Int64()
 	retType := memory.Get(retTypeOffset+32, retTypeLength)
-	retData, err := ret_parser.Parse(retType, retText)
+	retData, err := eni.ConvertReturnValue(retType, retText)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,6 @@
-package arg_parser
+package eni
 
 import "fmt"
-
-import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
 
 func printOrError(json string, err error) {
 	if err != nil {
@@ -13,29 +11,29 @@ func printOrError(json string, err error) {
 }
 
 // single positive integer (big endian)
-func ExampleParse_posInt() {
+func ExampleConvertArguments_posInt() {
 	var f, d []byte
 
 	f = make([]byte, 1, 1)
 	d = make([]byte, 70, 70)
-	f[0] = typecodes.INT
+	f[0] = INT
 	d[31] = uint8(72) // 32-byte big endian
-	json, err := Parse(f, d)
+	json, err := ConvertArguments(f, d)
 	printOrError(json, err)
 	// Output: [72]
 }
 
-func ExampleParse_bool() {
-	f := [1]byte{typecodes.BOOL}
+func ExampleConvertArguments_bool() {
+	f := [1]byte{BOOL}
 	var d [32]byte
 
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 	printOrError(json, err)
 
 	for i := 0; i < 32; i++ {
 		copy(d[:], make([]byte, 32, 32))
 		d[i] = uint8(72) // 32-byte big endian
-		json, err = Parse(f[:], d[:])
+		json, err = ConvertArguments(f[:], d[:])
 		printOrError(json, err)
 	}
 
@@ -75,33 +73,33 @@ func ExampleParse_bool() {
 }
 
 // a int and a bool
-func ExampleParse_intBool() {
-	f := [2]byte{typecodes.INT, typecodes.BOOL}
+func ExampleConvertArguments_intBool() {
+	f := [2]byte{INT, BOOL}
 	var d [70]byte
 	d[31] = uint8(72) // 32-byte big endian
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 	printOrError(json, err)
 
 	// Output: [72,false]
 }
 
 // a negative int
-func ExampleParse_negInt() {
-	f := [1]byte{typecodes.INT}
+func ExampleConvertArguments_negInt() {
+	f := [1]byte{INT}
 	var d [70]byte
 	for i := 0; i < 32; i++ {
 		d[i] = uint8(255)
 	}
 
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 
 	printOrError(json, err)
 	// Output: [-1]
 }
 
 // two strings
-func ExampleParse_string() {
-	f := [2]byte{typecodes.STRING, typecodes.STRING}
+func ExampleConvertArguments_string() {
+	f := [2]byte{STRING, STRING}
 	var d [160]byte
 	d[31] = uint8(3) // 32-byte big endian
 	strA := "abcd"
@@ -110,33 +108,33 @@ func ExampleParse_string() {
 	strB := "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
 	copy(d[96:], []byte(strB))
 
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 
 	printOrError(json, err)
 	// Output: ["abc","abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx"]
 }
 
-func ExampleParse_escapedString() {
-	f := [1]byte{typecodes.STRING}
+func ExampleConvertArguments_escapedString() {
+	f := [1]byte{STRING}
 	var d [64]byte
 	d[31] = uint8(7) // 32-byte big endian
 	strA := "abc\"d\\e"
 	copy(d[32:], []byte(strA))
 
-	json, _ := Parse(f[:], d[:])
+	json, _ := ConvertArguments(f[:], d[:])
 	fmt.Println(json)
 
 	// Output: ["abc\"d\\e"]
 }
 
-func ExampleParse_controlEscapedString() {
-	f := [1]byte{typecodes.STRING}
+func ExampleConvertArguments_controlEscapedString() {
+	f := [1]byte{STRING}
 	var d [64]byte
 	d[31] = uint8(9) // 32-byte big endian
 	strA := "abc\"d\\\b\x00e"
 	copy(d[32:], []byte(strA))
 
-	json, _ := Parse(f[:], d[:])
+	json, _ := ConvertArguments(f[:], d[:])
 	fmt.Println(json)
 
 	// Output: ["abc\"d\\\u0008\u0000e"]
@@ -144,14 +142,14 @@ func ExampleParse_controlEscapedString() {
 
 // encoding grammaer error
 // This happens when Lity byte code generates wrong encoding
-func ExampleParse_errorEncoding1() {
+func ExampleConvertArguments_errorEncoding1() {
 	f := [1]byte{155}
 	var d [70]byte
 	for i := 0; i < 32; i++ {
 		d[i] = uint8(255)
 	}
 
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 
 	printOrError(json, err)
 	// Output: Argument Parser Error: encoding error - unknown or not implemented type: 155
@@ -159,13 +157,13 @@ func ExampleParse_errorEncoding1() {
 
 // encoding grammaer error
 // This happens when Lity byte code generates wrong encoding
-func ExampleParse_errorEncoding2() {
-	f := [2]byte{typecodes.STRUCT_START, typecodes.INT}
+func ExampleConvertArguments_errorEncoding2() {
+	f := [2]byte{STRUCT_START, INT}
 	var d [70]byte
 	for i := 0; i < 32; i++ {
 		d[i] = uint8(255)
 	}
-	json, err := Parse(f[:], d[:])
+	json, err := ConvertArguments(f[:], d[:])
 
 	printOrError(json, err)
 	// Output: Argument Parser Error: runtime error: index out of range
@@ -173,6 +171,6 @@ func ExampleParse_errorEncoding2() {
 
 // data length mismatches ENI type encoding
 // This happens when Lity byte code generates wrong data length
-func ExampleParse_errorDataLength() {
+func ExampleConvertArguments_errorDataLength() {
 	// TODO
 }

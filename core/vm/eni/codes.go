@@ -1,4 +1,4 @@
-package typecodes
+package eni
 
 // token constant
 const (

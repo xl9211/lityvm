@@ -1,63 +1,68 @@
-package ret_parser
+package eni
 
-import "fmt"
-import "bytes"
-import "math/big"
-import "github.com/ethereum/go-ethereum/common/math"
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"math/big"
 
-import "github.com/ethereum/go-ethereum/core/vm/eni/typecodes"
+	"github.com/ethereum/go-ethereum/common/math"
+)
 
-func Parse(typeInfo []byte, jsonStr string) (ret []byte, err error) {
+type retConverter struct{}
+
+// ConvertReturnValue converts return value from JSON to ENI encoding
+func ConvertReturnValue(typeInfo []byte, jsonStr string) (ret []byte, err error) {
+	var cvt *retConverter
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("Return Parser Error: " + r.(string))
 		}
 	}()
 	json := []byte(jsonStr)
-	skipWS(&json)
-	expect(&json, '[')
+	cvt.skipWS(&json)
+	cvt.expect(&json, '[')
 	var dataBuf bytes.Buffer
 	for i := 0; 0 < len(typeInfo); i++ {
 		if 0 < i {
-			skipWS(&json)
-			expect(&json, ',')
+			cvt.skipWS(&json)
+			cvt.expect(&json, ',')
 		}
-		typeInfo, json = parseType(typeInfo, &dataBuf, []byte(json))
+		typeInfo, json = cvt.parseType(typeInfo, &dataBuf, []byte(json))
 	}
-	skipWS(&json)
-	expect(&json, ']')
+	cvt.skipWS(&json)
+	cvt.expect(&json, ']')
 	return dataBuf.Bytes(), err
 }
 
 // assuming that data are packed
-func parseType(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func (cvt *retConverter) parseType(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	t := typeInfo[0]
-	if typecodes.ComplexType[t] {
-		if t == typecodes.FIX_ARRAY_START {
-			typeInfo, json = parseFixArray(typeInfo, data, json)
-		} else if t == typecodes.DYN_ARRAY_START {
-			typeInfo, json = parseDynArray(typeInfo, data, json)
-		} else if t == typecodes.STRUCT_START {
-			typeInfo, json = parseStruct(typeInfo, data, json)
-		} else if t == typecodes.STRING {
-			typeInfo, json = parseString(typeInfo, data, json)
+	if ComplexType[t] {
+		if t == FIX_ARRAY_START {
+			typeInfo, json = cvt.parseFixArray(typeInfo, data, json)
+		} else if t == DYN_ARRAY_START {
+			typeInfo, json = cvt.parseDynArray(typeInfo, data, json)
+		} else if t == STRUCT_START {
+			typeInfo, json = cvt.parseStruct(typeInfo, data, json)
+		} else if t == STRING {
+			typeInfo, json = cvt.parseString(typeInfo, data, json)
 		}
 	} else { // value type
-		typeInfo, json = parseValue(typeInfo, data, json)
+		typeInfo, json = cvt.parseValue(typeInfo, data, json)
 	}
 	return typeInfo, json
 }
 
-func parseString(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func (cvt *retConverter) parseString(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	typeInfo = typeInfo[1:] // string
-	skipWS(&json)
-	expect(&json, '"')
+	cvt.skipWS(&json)
+	cvt.expect(&json, '"')
 	length := int64(0)
 	var buf bytes.Buffer
 	for json[0] != '"' {
 		if json[0] == '\\' {
-			buf.WriteByte(parseEscape(&json))
+			buf.WriteByte(cvt.parseEscape(&json))
 		} else {
 			buf.WriteByte(json[0])
 			json = json[1:]
@@ -70,83 +75,83 @@ func parseString(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []by
 	if length%32 > 0 {
 		data.Write(make([]byte, 32-length%32))
 	}
-	expect(&json, '"')
+	cvt.expect(&json, '"')
 	return typeInfo, json
 }
 
-func parseDynArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func (cvt *retConverter) parseDynArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	// TODO
 	return typeInfo, json
 }
 
-func parseFixArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func (cvt *retConverter) parseFixArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	typeInfo = typeInfo[1:] // fix_array_start
-	skipWS(&json)
-	expect(&json, '[')
+	cvt.skipWS(&json)
+	cvt.expect(&json, '[')
 	leng := new(big.Int).SetBytes(typeInfo[:32]).Int64()
 	typeInfo = typeInfo[32:]
 
 	for i := int64(0); i < leng; i++ {
 		if i > 0 {
-			skipWS(&json)
-			expect(&json, ',')
+			cvt.skipWS(&json)
+			cvt.expect(&json, ',')
 		}
 		if i == leng-1 {
-			typeInfo, json = parseType(typeInfo, data, json)
+			typeInfo, json = cvt.parseType(typeInfo, data, json)
 		} else {
-			_, json = parseType(typeInfo, data, json)
+			_, json = cvt.parseType(typeInfo, data, json)
 		}
 	}
 
-	skipWS(&json)
-	expect(&json, ']')
+	cvt.skipWS(&json)
+	cvt.expect(&json, ']')
 	return typeInfo, json
 }
 
-func parseStruct(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
-	skipWS(&json)
-	expect(&json, '[')
+func (cvt *retConverter) parseStruct(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+	cvt.skipWS(&json)
+	cvt.expect(&json, '[')
 	for i := 0; ; i++ {
 		t := typeInfo[0]
-		skipWS(&json)
-		expect(&json, ',')
-		if t != typecodes.STRUCT_END {
-			typeInfo, json = parseType(typeInfo, data, json)
+		cvt.skipWS(&json)
+		cvt.expect(&json, ',')
+		if t != STRUCT_END {
+			typeInfo, json = cvt.parseType(typeInfo, data, json)
 			break
 		}
 	}
 	typeInfo = typeInfo[1:] // struct_end
-	skipWS(&json)
-	expect(&json, ']')
+	cvt.skipWS(&json)
+	cvt.expect(&json, ']')
 	return typeInfo, json
 }
 
-func parseValue(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
+func (cvt *retConverter) parseValue(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	t := typeInfo[0]
-	skipWS(&json)
-	if t == typecodes.BOOL {
-		if have(&json, 't') {
-			expect(&json, 'r')
-			expect(&json, 'u')
-			expect(&json, 'e')
+	cvt.skipWS(&json)
+	if t == BOOL {
+		if cvt.have(&json, 't') {
+			cvt.expect(&json, 'r')
+			cvt.expect(&json, 'u')
+			cvt.expect(&json, 'e')
 			data.Write(make([]byte, 31, 31))
 			data.WriteByte(byte(1))
-		} else if have(&json, 'f') {
-			expect(&json, 'a')
-			expect(&json, 'l')
-			expect(&json, 's')
-			expect(&json, 'e')
+		} else if cvt.have(&json, 'f') {
+			cvt.expect(&json, 'a')
+			cvt.expect(&json, 'l')
+			cvt.expect(&json, 's')
+			cvt.expect(&json, 'e')
 			data.Write(make([]byte, 32, 32))
 		} else { // err
 			panic(fmt.Sprintf("expected boolean, found '%c'", json[0]))
 		}
-	} else if typecodes.IsSint(t) { // signed integer
+	} else if IsSint(t) { // signed integer
 		i := 0
 		ojson := json
-		if have(&json, '-') {
+		if cvt.have(&json, '-') {
 			i++
 		}
-		for haveDigit(&json) {
+		for cvt.haveDigit(&json) {
 			i++
 		}
 		if i == 0 || (i == 1 && ojson[0] == '-') {
@@ -163,10 +168,10 @@ func parseValue(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byt
 		n.Add(n, big.NewInt(int64(1)))
 		b = math.PaddedBigBytes(n, 32)
 		data.Write(b)
-	} else if typecodes.IsUint(t) { // unsigned integer
+	} else if IsUint(t) { // unsigned integer
 		i := 0
 		ojson := json
-		for haveDigit(&json) {
+		for cvt.haveDigit(&json) {
 			i++
 		}
 		if i == 0 {
@@ -183,7 +188,7 @@ func parseValue(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byt
 	return typeInfo, json
 }
 
-func parseEscape(json *[]byte) (ch byte) {
+func (cvt *retConverter) parseEscape(json *[]byte) (ch byte) {
 	if (*json)[1] == '\\' || (*json)[1] == '"' {
 		ch = (*json)[1]
 	} else if (*json)[1] == '/' {
@@ -220,7 +225,7 @@ func parseEscape(json *[]byte) (ch byte) {
 	return ch
 }
 
-func have(json *[]byte, c byte) bool {
+func (cvt *retConverter) have(json *[]byte, c byte) bool {
 	if (*json)[0] == c {
 		*json = (*json)[1:]
 		return true
@@ -229,7 +234,7 @@ func have(json *[]byte, c byte) bool {
 	}
 }
 
-func haveDigit(json *[]byte) bool {
+func (cvt *retConverter) haveDigit(json *[]byte) bool {
 	if len(*json) > 0 && (*json)[0] >= '0' && (*json)[0] <= '9' {
 		*json = (*json)[1:]
 		return true
@@ -238,11 +243,11 @@ func haveDigit(json *[]byte) bool {
 	}
 }
 
-func expect(json *[]byte, c byte) {
-	expectMsg(json, c, fmt.Sprintf("expected '%c', found '%c'", c, (*json)[0]))
+func (cvt *retConverter) expect(json *[]byte, c byte) {
+	cvt.expectMsg(json, c, fmt.Sprintf("expected '%c', found '%c'", c, (*json)[0]))
 }
 
-func expectMsg(json *[]byte, c byte, errMsg string) {
+func (cvt *retConverter) expectMsg(json *[]byte, c byte, errMsg string) {
 	if (*json)[0] != c {
 		panic(errMsg)
 	} else {
@@ -250,7 +255,7 @@ func expectMsg(json *[]byte, c byte, errMsg string) {
 	}
 }
 
-func skipWS(json *[]byte) {
+func (cvt *retConverter) skipWS(json *[]byte) {
 	for 1 < len(*json) && ((*json)[0] == ' ' || (*json)[0] == '\t' || (*json)[0] == '\n' || (*json)[0] == '\r') {
 		*json = (*json)[1:]
 	}

@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/core/vm/eni/arg_parser"
+	"github.com/ethereum/go-ethereum/core/vm/eni"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -923,7 +923,7 @@ func initENI(evm *EVM, stack *Stack, memory *Memory) error {
 	}
 	argsType := memory.Get(typeOffset+32, argsTypeLength)
 	argsData := memory.Get(dataOffset+32, argsDataLength)
-	argsText, err := arg_parser.Parse(argsType, argsData)
+	argsText, err := eni.ConvertArguments(argsType, argsData)
 	if err != nil {
 		return err
 	}
