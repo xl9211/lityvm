@@ -1,7 +1,7 @@
 package eni
 
 /*
-#cgo LDFLAGS: -ldl
+#cgo LDFLAGS: -ldl -I${SRCDIR}/core/vm/eni
 #include <dlfcn.h>
 #include <stdint.h>
 #include <stdlib.h>
