@@ -82,7 +82,6 @@ func (cvt *retConverter) parseString(typeInfo []byte, data *bytes.Buffer, json [
 func (cvt *retConverter) parseDynArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {
 	// TODO
 	panic("dynamic array not implemented yet!")
-	return typeInfo, json
 }
 
 func (cvt *retConverter) parseFixArray(typeInfo []byte, data *bytes.Buffer, json []byte) ([]byte, []byte) {

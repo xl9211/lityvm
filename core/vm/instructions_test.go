@@ -104,6 +104,14 @@ func TestSsub(t *testing.T) {
 	if err == nil {
 		t.Errorf("Ssub should overflow")
 	}
+	a.SetString("0000000000000000000000000000000000000000000000000000000000000001", 16)
+	stack.push(a)
+	b.SetString("0000000000000000000000000000000000000000000000000000000000000087", 16)
+	stack.push(b)
+	_, err = opSsub(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Ssub should not overflow")
+	}
 }
 func TestUsub(t *testing.T) {
 	var (
@@ -121,6 +129,14 @@ func TestUsub(t *testing.T) {
 	if err == nil {
 		t.Errorf("Usub should overflow")
 	}
+	a.SetString("0000000000000000000000000000000000000000000000000000000000000001", 16)
+	stack.push(a)
+	b.SetString("0000000000000000000000000000000000000000000000000000000000000087", 16)
+	stack.push(b)
+	_, err = opUsub(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Ssub should not overflow")
+	}
 }
 
 func TestSmul(t *testing.T) {
@@ -137,6 +153,13 @@ func TestSmul(t *testing.T) {
 	if err == nil {
 		t.Errorf("Smul should overflow")
 	}
+	a.SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err = opSmul(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Umul should not overflow")
+	}
 }
 
 func TestUmul(t *testing.T) {
@@ -152,6 +175,13 @@ func TestUmul(t *testing.T) {
 	_, err := opUmul(&pc, env, nil, nil, stack)
 	if err == nil {
 		t.Errorf("Umul should overflow")
+	}
+	a.SetString("ffffffffffffffffffffff", 16)
+	stack.push(a)
+	stack.push(a)
+	_, err = opUmul(&pc, env, nil, nil, stack)
+	if err != nil {
+		t.Errorf("Umul should not overflow")
 	}
 }
 

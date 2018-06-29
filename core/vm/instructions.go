@@ -825,7 +825,7 @@ func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 
 	evm.interpreter.intPool.put(y)
 
-	return nil, errors.New("UMUL overflow")
+	return nil, nil
 }
 
 // following functions are used by the instruction jump  table
