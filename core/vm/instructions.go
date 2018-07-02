@@ -697,7 +697,7 @@ func opENI(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stac
 		nextFreeMemoryOffset += 32 - nextFreeMemoryOffset%32
 	}
 	memory.Set(uint64(0x40), 32, math.PaddedBigBytes(big.NewInt(int64(nextFreeMemoryOffset)), 32))
-	stack.push(big.NewInt(retDataOffset))
+	stack.push(big.NewInt(retDataOffset + 32))
 	return nil, nil
 }
 
