@@ -120,9 +120,11 @@ func (cvt *argConverter) parseStruct(typeInfo []byte, data []byte, json *bytes.B
 		}
 		if t != STRUCT_END {
 			typeInfo, data = cvt.parseType(typeInfo, data, json)
+		} else {
+			break
 		}
 	}
-	if typeInfo[0] != STRUCT_START {
+	if typeInfo[0] != STRUCT_END {
 		panic("encoding error - expected struct_end token")
 	}
 	typeInfo = typeInfo[1:] // struct_end
