@@ -859,7 +859,6 @@ func opSadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 
 	stack.push(math.SignAbsTo256Twos(z))
 
-	evm.interpreter.intPool.put(y)
 	return nil, nil
 }
 
@@ -874,8 +873,6 @@ func opUadd(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	}
 
 	stack.push(math.U256(z))
-
-	evm.interpreter.intPool.put(y)
 
 	return nil, nil
 }
@@ -894,7 +891,6 @@ func opSsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 
 	stack.push(math.SignAbsTo256Twos(z))
 
-	evm.interpreter.intPool.put(y)
 	return nil, nil
 }
 
@@ -909,8 +905,6 @@ func opUsub(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	}
 
 	stack.push(math.U256(z))
-
-	evm.interpreter.intPool.put(y)
 
 	return nil, nil
 }
@@ -929,7 +923,6 @@ func opSmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 
 	stack.push(math.SignAbsTo256Twos(z))
 
-	evm.interpreter.intPool.put(y)
 	return nil, nil
 }
 
@@ -944,8 +937,6 @@ func opUmul(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 	}
 
 	stack.push(math.U256(z))
-
-	evm.interpreter.intPool.put(y)
 
 	return nil, nil
 }
