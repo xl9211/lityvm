@@ -41,7 +41,6 @@ type Config struct {
 	GasLimit    uint64
 	GasPrice    *big.Int
 	Value       *big.Int
-	DisableJit  bool // "disable" so it's enabled by default
 	Debug       bool
 	EVMConfig   vm.Config
 
@@ -53,7 +52,7 @@ type Config struct {
 func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
 		cfg.ChainConfig = &params.ChainConfig{
-			ChainId:        big.NewInt(1),
+			ChainID:        big.NewInt(1),
 			HomesteadBlock: new(big.Int),
 			DAOForkBlock:   new(big.Int),
 			DAOForkSupport: false,
@@ -92,8 +91,7 @@ func setDefaults(cfg *Config) {
 // It returns the EVM's return value, the new state and an error if it failed.
 //
 // Executes sets up a in memory, temporarily, environment for the execution of
-// the given code. It enabled the JIT by default and make sure that it's restored
-// to it's original state afterwards.
+// the given code. It makes sure that it's restored to it's original state afterwards.
 func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 	if cfg == nil {
 		cfg = new(Config)
@@ -101,12 +99,11 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 	setDefaults(cfg)
 
 	if cfg.State == nil {
-		db, _ := ethdb.NewMemDatabase()
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(db))
+		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	}
 	var (
-		address = common.StringToAddress("contract")
-		vmenv   = NewEnv(cfg, cfg.State)
+		address = common.BytesToAddress([]byte("contract"))
+		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
 	)
 	cfg.State.CreateAccount(address)
@@ -115,7 +112,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 	// Call the code with the given configuration.
 	ret, _, err := vmenv.Call(
 		sender,
-		common.StringToAddress("contract"),
+		common.BytesToAddress([]byte("contract")),
 		input,
 		cfg.GasLimit,
 		cfg.Value,
@@ -132,11 +129,10 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	setDefaults(cfg)
 
 	if cfg.State == nil {
-		db, _ := ethdb.NewMemDatabase()
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(db))
+		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	}
 	var (
-		vmenv  = NewEnv(cfg, cfg.State)
+		vmenv  = NewEnv(cfg)
 		sender = vm.AccountRef(cfg.Origin)
 	)
 
@@ -158,7 +154,7 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, error) {
 	setDefaults(cfg)
 
-	vmenv := NewEnv(cfg, cfg.State)
+	vmenv := NewEnv(cfg)
 
 	sender := cfg.State.GetOrNewStateObject(cfg.Origin)
 	// Call the code with the given configuration.

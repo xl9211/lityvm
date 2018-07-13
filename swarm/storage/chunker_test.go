@@ -20,12 +20,12 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"runtime"
-	"sync"
 	"testing"
-	"time"
+
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
 /*
@@ -39,95 +39,33 @@ type test interface {
 
 type chunkerTester struct {
 	inputs map[uint64][]byte
-	chunks map[string]*Chunk
 	t      test
 }
 
-func (self *chunkerTester) checkChunks(t *testing.T, want int) {
-	l := len(self.chunks)
-	if l != want {
-		t.Errorf("expected %v chunks, got %v", want, l)
-	}
+// fakeChunkStore doesn't store anything, just implements the ChunkStore interface
+// It can be used to inject into a hasherStore if you don't want to actually store data just do the
+// hashing
+type fakeChunkStore struct {
 }
 
-func (self *chunkerTester) Split(chunker Splitter, data io.Reader, size int64, chunkC chan *Chunk, swg *sync.WaitGroup, expectedError error) (key Key) {
-	// reset
-	self.chunks = make(map[string]*Chunk)
-
-	if self.inputs == nil {
-		self.inputs = make(map[uint64][]byte)
-	}
-
-	quitC := make(chan bool)
-	timeout := time.After(600 * time.Second)
-	if chunkC != nil {
-		go func() {
-			for {
-				select {
-				case <-timeout:
-					self.t.Fatalf("Join timeout error")
-				case <-quitC:
-					return
-				case chunk := <-chunkC:
-					// self.chunks = append(self.chunks, chunk)
-					self.chunks[chunk.Key.String()] = chunk
-					if chunk.wg != nil {
-						chunk.wg.Done()
-					}
-				}
-			}
-		}()
-	}
-	key, err := chunker.Split(data, size, chunkC, swg, nil)
-	if err != nil && expectedError == nil {
-		self.t.Fatalf("Split error: %v", err)
-	} else if expectedError != nil && (err == nil || err.Error() != expectedError.Error()) {
-		self.t.Fatalf("Not receiving the correct error! Expected %v, received %v", expectedError, err)
-	}
-	if chunkC != nil {
-		if swg != nil {
-			swg.Wait()
-		}
-		close(quitC)
-	}
-	return
+// Put doesn't store anything it is just here to implement ChunkStore
+func (f *fakeChunkStore) Put(*Chunk) {
 }
 
-func (self *chunkerTester) Join(chunker Chunker, key Key, c int, chunkC chan *Chunk, quitC chan bool) LazySectionReader {
-	// reset but not the chunks
-
-	reader := chunker.Join(key, chunkC)
-
-	timeout := time.After(600 * time.Second)
-	i := 0
-	go func() {
-		for {
-			select {
-			case <-timeout:
-				self.t.Fatalf("Join timeout error")
-
-			case chunk, ok := <-chunkC:
-				if !ok {
-					close(quitC)
-					return
-				}
-				// this just mocks the behaviour of a chunk store retrieval
-				stored, success := self.chunks[chunk.Key.String()]
-				if !success {
-					self.t.Fatalf("not found")
-					return
-				}
-				chunk.SData = stored.SData
-				chunk.Size = int64(binary.LittleEndian.Uint64(chunk.SData[0:8]))
-				close(chunk.C)
-				i++
-			}
-		}
-	}()
-	return reader
+// Gut doesn't store anything it is just here to implement ChunkStore
+func (f *fakeChunkStore) Get(Address) (*Chunk, error) {
+	return nil, errors.New("FakeChunkStore doesn't support Get")
 }
 
-func testRandomBrokenData(splitter Splitter, n int, tester *chunkerTester) {
+// Close doesn't store anything it is just here to implement ChunkStore
+func (f *fakeChunkStore) Close() {
+}
+
+func newTestHasherStore(chunkStore ChunkStore, hash string) *hasherStore {
+	return NewHasherStore(chunkStore, MakeHashFunc(hash), false)
+}
+
+func testRandomBrokenData(n int, tester *chunkerTester) {
 	data := io.LimitReader(rand.Reader, int64(n))
 	brokendata := brokenLimitReader(data, n, n/2)
 
@@ -140,37 +78,46 @@ func testRandomBrokenData(splitter Splitter, n int, tester *chunkerTester) {
 	data = io.LimitReader(rand.Reader, int64(n))
 	brokendata = brokenLimitReader(data, n, n/2)
 
-	chunkC := make(chan *Chunk, 1000)
-	swg := &sync.WaitGroup{}
+	putGetter := newTestHasherStore(NewMapChunkStore(), SHA3Hash)
 
-	key := tester.Split(splitter, brokendata, int64(n), chunkC, swg, fmt.Errorf("Broken reader"))
-	tester.t.Logf(" Key = %v\n", key)
+	expectedError := fmt.Errorf("Broken reader")
+	addr, _, err := TreeSplit(brokendata, int64(n), putGetter)
+	if err == nil || err.Error() != expectedError.Error() {
+		tester.t.Fatalf("Not receiving the correct error! Expected %v, received %v", expectedError, err)
+	}
+	tester.t.Logf(" Key = %v\n", addr)
 }
 
-func testRandomData(splitter Splitter, n int, tester *chunkerTester) {
+func testRandomData(usePyramid bool, hash string, n int, tester *chunkerTester) Address {
 	if tester.inputs == nil {
 		tester.inputs = make(map[uint64][]byte)
 	}
 	input, found := tester.inputs[uint64(n)]
 	var data io.Reader
 	if !found {
-		data, input = testDataReaderAndSlice(n)
+		data, input = generateRandomData(n)
 		tester.inputs[uint64(n)] = input
 	} else {
 		data = io.LimitReader(bytes.NewReader(input), int64(n))
 	}
 
-	chunkC := make(chan *Chunk, 1000)
-	swg := &sync.WaitGroup{}
+	putGetter := newTestHasherStore(NewMapChunkStore(), hash)
 
-	key := tester.Split(splitter, data, int64(n), chunkC, swg, nil)
-	tester.t.Logf(" Key = %v\n", key)
+	var addr Address
+	var wait func()
+	var err error
+	if usePyramid {
+		addr, wait, err = PyramidSplit(data, putGetter, putGetter)
+	} else {
+		addr, wait, err = TreeSplit(data, int64(n), putGetter)
+	}
+	if err != nil {
+		tester.t.Fatalf(err.Error())
+	}
+	tester.t.Logf(" Key = %v\n", addr)
+	wait()
 
-	chunkC = make(chan *Chunk, 1000)
-	quitC := make(chan bool)
-
-	chunker := NewTreeChunker(NewChunkerParams())
-	reader := tester.Join(chunker, key, 0, chunkC, quitC)
+	reader := TreeJoin(addr, putGetter, 0)
 	output := make([]byte, n)
 	r, err := reader.Read(output)
 	if r != n || err != io.EOF {
@@ -181,45 +128,143 @@ func testRandomData(splitter Splitter, n int, tester *chunkerTester) {
 			tester.t.Fatalf("input and output mismatch\n IN: %v\nOUT: %v\n", input, output)
 		}
 	}
-	close(chunkC)
-	<-quitC
+
+	// testing partial read
+	for i := 1; i < n; i += 10000 {
+		readableLength := n - i
+		output := make([]byte, readableLength)
+		r, err := reader.ReadAt(output, int64(i))
+		if r != readableLength || err != io.EOF {
+			tester.t.Fatalf("readAt error with offset %v read: %v  n = %v  err = %v\n", i, r, readableLength, err)
+		}
+		if input != nil {
+			if !bytes.Equal(output, input[i:]) {
+				tester.t.Fatalf("input and output mismatch\n IN: %v\nOUT: %v\n", input[i:], output)
+			}
+		}
+	}
+
+	return addr
+}
+
+func TestSha3ForCorrectness(t *testing.T) {
+	tester := &chunkerTester{t: t}
+
+	size := 4096
+	input := make([]byte, size+8)
+	binary.LittleEndian.PutUint64(input[:8], uint64(size))
+
+	io.LimitReader(bytes.NewReader(input[8:]), int64(size))
+
+	rawSha3 := sha3.NewKeccak256()
+	rawSha3.Reset()
+	rawSha3.Write(input)
+	rawSha3Output := rawSha3.Sum(nil)
+
+	sha3FromMakeFunc := MakeHashFunc(SHA3Hash)()
+	sha3FromMakeFunc.ResetWithLength(input[:8])
+	sha3FromMakeFunc.Write(input[8:])
+	sha3FromMakeFuncOutput := sha3FromMakeFunc.Sum(nil)
+
+	if len(rawSha3Output) != len(sha3FromMakeFuncOutput) {
+		tester.t.Fatalf("Original SHA3 and abstracted Sha3 has different length %v:%v\n", len(rawSha3Output), len(sha3FromMakeFuncOutput))
+	}
+
+	if !bytes.Equal(rawSha3Output, sha3FromMakeFuncOutput) {
+		tester.t.Fatalf("Original SHA3 and abstracted Sha3 mismatch %v:%v\n", rawSha3Output, sha3FromMakeFuncOutput)
+	}
+
+}
+
+func TestDataAppend(t *testing.T) {
+	sizes := []int{1, 1, 1, 4095, 4096, 4097, 1, 1, 1, 123456, 2345678, 2345678}
+	appendSizes := []int{4095, 4096, 4097, 1, 1, 1, 8191, 8192, 8193, 9000, 3000, 5000}
+
+	tester := &chunkerTester{t: t}
+	for i := range sizes {
+		n := sizes[i]
+		m := appendSizes[i]
+
+		if tester.inputs == nil {
+			tester.inputs = make(map[uint64][]byte)
+		}
+		input, found := tester.inputs[uint64(n)]
+		var data io.Reader
+		if !found {
+			data, input = generateRandomData(n)
+			tester.inputs[uint64(n)] = input
+		} else {
+			data = io.LimitReader(bytes.NewReader(input), int64(n))
+		}
+
+		chunkStore := NewMapChunkStore()
+		putGetter := newTestHasherStore(chunkStore, SHA3Hash)
+
+		addr, wait, err := PyramidSplit(data, putGetter, putGetter)
+		if err != nil {
+			tester.t.Fatalf(err.Error())
+		}
+		wait()
+
+		//create a append data stream
+		appendInput, found := tester.inputs[uint64(m)]
+		var appendData io.Reader
+		if !found {
+			appendData, appendInput = generateRandomData(m)
+			tester.inputs[uint64(m)] = appendInput
+		} else {
+			appendData = io.LimitReader(bytes.NewReader(appendInput), int64(m))
+		}
+
+		putGetter = newTestHasherStore(chunkStore, SHA3Hash)
+		newAddr, wait, err := PyramidAppend(addr, appendData, putGetter, putGetter)
+		if err != nil {
+			tester.t.Fatalf(err.Error())
+		}
+		wait()
+
+		reader := TreeJoin(newAddr, putGetter, 0)
+		newOutput := make([]byte, n+m)
+		r, err := reader.Read(newOutput)
+		if r != (n + m) {
+			tester.t.Fatalf("read error  read: %v  n = %v  m = %v  err = %v\n", r, n, m, err)
+		}
+
+		newInput := append(input, appendInput...)
+		if !bytes.Equal(newOutput, newInput) {
+			tester.t.Fatalf("input and output mismatch\n IN: %v\nOUT: %v\n", newInput, newOutput)
+		}
+	}
 }
 
 func TestRandomData(t *testing.T) {
-	// sizes := []int{123456}
-	sizes := []int{1, 60, 83, 179, 253, 1024, 4095, 4096, 4097, 8191, 8192, 8193, 123456, 2345678}
+	// This test can validate files up to a relatively short length, as tree chunker slows down drastically.
+	// Validation of longer files is done by TestLocalStoreAndRetrieve in swarm package.
+	sizes := []int{1, 60, 83, 179, 253, 1024, 4095, 4096, 4097, 8191, 8192, 8193, 12287, 12288, 12289, 524288, 524288 + 1, 524288 + 4097, 7 * 524288, 7*524288 + 1, 7*524288 + 4097}
 	tester := &chunkerTester{t: t}
-	chunker := NewTreeChunker(NewChunkerParams())
+
 	for _, s := range sizes {
-		testRandomData(chunker, s, tester)
+		treeChunkerKey := testRandomData(false, SHA3Hash, s, tester)
+		pyramidChunkerKey := testRandomData(true, SHA3Hash, s, tester)
+		if treeChunkerKey.String() != pyramidChunkerKey.String() {
+			tester.t.Fatalf("tree chunker and pyramid chunker key mismatch for size %v\n TC: %v\n PC: %v\n", s, treeChunkerKey.String(), pyramidChunkerKey.String())
+		}
 	}
-	pyramid := NewPyramidChunker(NewChunkerParams())
+
 	for _, s := range sizes {
-		testRandomData(pyramid, s, tester)
+		treeChunkerKey := testRandomData(false, BMTHash, s, tester)
+		pyramidChunkerKey := testRandomData(true, BMTHash, s, tester)
+		if treeChunkerKey.String() != pyramidChunkerKey.String() {
+			tester.t.Fatalf("tree chunker and pyramid chunker key mismatch for size %v\n TC: %v\n PC: %v\n", s, treeChunkerKey.String(), pyramidChunkerKey.String())
+		}
 	}
 }
 
 func TestRandomBrokenData(t *testing.T) {
-	sizes := []int{1, 60, 83, 179, 253, 1024, 4095, 4096, 4097, 8191, 8192, 8193, 123456, 2345678}
+	sizes := []int{1, 60, 83, 179, 253, 1024, 4095, 4096, 4097, 8191, 8192, 8193, 12287, 12288, 12289, 123456, 2345678}
 	tester := &chunkerTester{t: t}
-	chunker := NewTreeChunker(NewChunkerParams())
 	for _, s := range sizes {
-		testRandomBrokenData(chunker, s, tester)
-		t.Logf("done size: %v", s)
-	}
-}
-
-func readAll(reader LazySectionReader, result []byte) {
-	size := int64(len(result))
-
-	var end int64
-	for pos := int64(0); pos < size; pos += 1000 {
-		if pos+1000 > size {
-			end = size
-		} else {
-			end = pos + 1000
-		}
-		reader.ReadAt(result[pos:end], pos)
+		testRandomBrokenData(s, tester)
 	}
 }
 
@@ -231,85 +276,166 @@ func benchReadAll(reader LazySectionReader) {
 	}
 }
 
-func benchmarkJoin(n int, t *testing.B) {
+func benchmarkSplitJoin(n int, t *testing.B) {
 	t.ReportAllocs()
 	for i := 0; i < t.N; i++ {
-		chunker := NewTreeChunker(NewChunkerParams())
-		tester := &chunkerTester{t: t}
 		data := testDataReader(n)
 
-		chunkC := make(chan *Chunk, 1000)
-		swg := &sync.WaitGroup{}
-
-		key := tester.Split(chunker, data, int64(n), chunkC, swg, nil)
-		// t.StartTimer()
-		chunkC = make(chan *Chunk, 1000)
-		quitC := make(chan bool)
-		reader := tester.Join(chunker, key, i, chunkC, quitC)
+		putGetter := newTestHasherStore(NewMapChunkStore(), SHA3Hash)
+		key, wait, err := PyramidSplit(data, putGetter, putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		wait()
+		reader := TreeJoin(key, putGetter, 0)
 		benchReadAll(reader)
-		close(chunkC)
-		<-quitC
-		// t.StopTimer()
 	}
-	stats := new(runtime.MemStats)
-	runtime.ReadMemStats(stats)
-	fmt.Println(stats.Sys)
 }
 
-func benchmarkSplitTree(n int, t *testing.B) {
+func benchmarkSplitTreeSHA3(n int, t *testing.B) {
 	t.ReportAllocs()
 	for i := 0; i < t.N; i++ {
-		chunker := NewTreeChunker(NewChunkerParams())
-		tester := &chunkerTester{t: t}
 		data := testDataReader(n)
-		tester.Split(chunker, data, int64(n), nil, nil, nil)
+		putGetter := newTestHasherStore(&fakeChunkStore{}, SHA3Hash)
+
+		_, _, err := TreeSplit(data, int64(n), putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
 	}
-	stats := new(runtime.MemStats)
-	runtime.ReadMemStats(stats)
-	fmt.Println(stats.Sys)
 }
 
-func benchmarkSplitPyramid(n int, t *testing.B) {
+func benchmarkSplitTreeBMT(n int, t *testing.B) {
 	t.ReportAllocs()
 	for i := 0; i < t.N; i++ {
-		splitter := NewPyramidChunker(NewChunkerParams())
-		tester := &chunkerTester{t: t}
 		data := testDataReader(n)
-		tester.Split(splitter, data, int64(n), nil, nil, nil)
+		putGetter := newTestHasherStore(&fakeChunkStore{}, BMTHash)
+
+		_, _, err := TreeSplit(data, int64(n), putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
 	}
-	stats := new(runtime.MemStats)
-	runtime.ReadMemStats(stats)
-	fmt.Println(stats.Sys)
 }
 
-func BenchmarkJoin_2(t *testing.B) { benchmarkJoin(100, t) }
-func BenchmarkJoin_3(t *testing.B) { benchmarkJoin(1000, t) }
-func BenchmarkJoin_4(t *testing.B) { benchmarkJoin(10000, t) }
-func BenchmarkJoin_5(t *testing.B) { benchmarkJoin(100000, t) }
-func BenchmarkJoin_6(t *testing.B) { benchmarkJoin(1000000, t) }
-func BenchmarkJoin_7(t *testing.B) { benchmarkJoin(10000000, t) }
-func BenchmarkJoin_8(t *testing.B) { benchmarkJoin(100000000, t) }
+func benchmarkSplitPyramidSHA3(n int, t *testing.B) {
+	t.ReportAllocs()
+	for i := 0; i < t.N; i++ {
+		data := testDataReader(n)
+		putGetter := newTestHasherStore(&fakeChunkStore{}, SHA3Hash)
 
-func BenchmarkSplitTree_2(t *testing.B)  { benchmarkSplitTree(100, t) }
-func BenchmarkSplitTree_2h(t *testing.B) { benchmarkSplitTree(500, t) }
-func BenchmarkSplitTree_3(t *testing.B)  { benchmarkSplitTree(1000, t) }
-func BenchmarkSplitTree_3h(t *testing.B) { benchmarkSplitTree(5000, t) }
-func BenchmarkSplitTree_4(t *testing.B)  { benchmarkSplitTree(10000, t) }
-func BenchmarkSplitTree_4h(t *testing.B) { benchmarkSplitTree(50000, t) }
-func BenchmarkSplitTree_5(t *testing.B)  { benchmarkSplitTree(100000, t) }
-func BenchmarkSplitTree_6(t *testing.B)  { benchmarkSplitTree(1000000, t) }
-func BenchmarkSplitTree_7(t *testing.B)  { benchmarkSplitTree(10000000, t) }
-func BenchmarkSplitTree_8(t *testing.B)  { benchmarkSplitTree(100000000, t) }
+		_, _, err := PyramidSplit(data, putGetter, putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
 
-func BenchmarkSplitPyramid_2(t *testing.B)  { benchmarkSplitPyramid(100, t) }
-func BenchmarkSplitPyramid_2h(t *testing.B) { benchmarkSplitPyramid(500, t) }
-func BenchmarkSplitPyramid_3(t *testing.B)  { benchmarkSplitPyramid(1000, t) }
-func BenchmarkSplitPyramid_3h(t *testing.B) { benchmarkSplitPyramid(5000, t) }
-func BenchmarkSplitPyramid_4(t *testing.B)  { benchmarkSplitPyramid(10000, t) }
-func BenchmarkSplitPyramid_4h(t *testing.B) { benchmarkSplitPyramid(50000, t) }
-func BenchmarkSplitPyramid_5(t *testing.B)  { benchmarkSplitPyramid(100000, t) }
-func BenchmarkSplitPyramid_6(t *testing.B)  { benchmarkSplitPyramid(1000000, t) }
-func BenchmarkSplitPyramid_7(t *testing.B)  { benchmarkSplitPyramid(10000000, t) }
-func BenchmarkSplitPyramid_8(t *testing.B)  { benchmarkSplitPyramid(100000000, t) }
+	}
+}
 
-// godep go test -bench ./swarm/storage -cpuprofile cpu.out -memprofile mem.out
+func benchmarkSplitPyramidBMT(n int, t *testing.B) {
+	t.ReportAllocs()
+	for i := 0; i < t.N; i++ {
+		data := testDataReader(n)
+		putGetter := newTestHasherStore(&fakeChunkStore{}, BMTHash)
+
+		_, _, err := PyramidSplit(data, putGetter, putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+	}
+}
+
+func benchmarkSplitAppendPyramid(n, m int, t *testing.B) {
+	t.ReportAllocs()
+	for i := 0; i < t.N; i++ {
+		data := testDataReader(n)
+		data1 := testDataReader(m)
+
+		chunkStore := NewMapChunkStore()
+		putGetter := newTestHasherStore(chunkStore, SHA3Hash)
+
+		key, wait, err := PyramidSplit(data, putGetter, putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		wait()
+
+		putGetter = newTestHasherStore(chunkStore, SHA3Hash)
+		_, wait, err = PyramidAppend(key, data1, putGetter, putGetter)
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+		wait()
+	}
+}
+
+func BenchmarkSplitJoin_2(t *testing.B) { benchmarkSplitJoin(100, t) }
+func BenchmarkSplitJoin_3(t *testing.B) { benchmarkSplitJoin(1000, t) }
+func BenchmarkSplitJoin_4(t *testing.B) { benchmarkSplitJoin(10000, t) }
+func BenchmarkSplitJoin_5(t *testing.B) { benchmarkSplitJoin(100000, t) }
+func BenchmarkSplitJoin_6(t *testing.B) { benchmarkSplitJoin(1000000, t) }
+func BenchmarkSplitJoin_7(t *testing.B) { benchmarkSplitJoin(10000000, t) }
+
+// func BenchmarkSplitJoin_8(t *testing.B) { benchmarkJoin(100000000, t) }
+
+func BenchmarkSplitTreeSHA3_2(t *testing.B)  { benchmarkSplitTreeSHA3(100, t) }
+func BenchmarkSplitTreeSHA3_2h(t *testing.B) { benchmarkSplitTreeSHA3(500, t) }
+func BenchmarkSplitTreeSHA3_3(t *testing.B)  { benchmarkSplitTreeSHA3(1000, t) }
+func BenchmarkSplitTreeSHA3_3h(t *testing.B) { benchmarkSplitTreeSHA3(5000, t) }
+func BenchmarkSplitTreeSHA3_4(t *testing.B)  { benchmarkSplitTreeSHA3(10000, t) }
+func BenchmarkSplitTreeSHA3_4h(t *testing.B) { benchmarkSplitTreeSHA3(50000, t) }
+func BenchmarkSplitTreeSHA3_5(t *testing.B)  { benchmarkSplitTreeSHA3(100000, t) }
+func BenchmarkSplitTreeSHA3_6(t *testing.B)  { benchmarkSplitTreeSHA3(1000000, t) }
+func BenchmarkSplitTreeSHA3_7(t *testing.B)  { benchmarkSplitTreeSHA3(10000000, t) }
+
+// func BenchmarkSplitTreeSHA3_8(t *testing.B)  { benchmarkSplitTreeSHA3(100000000, t) }
+
+func BenchmarkSplitTreeBMT_2(t *testing.B)  { benchmarkSplitTreeBMT(100, t) }
+func BenchmarkSplitTreeBMT_2h(t *testing.B) { benchmarkSplitTreeBMT(500, t) }
+func BenchmarkSplitTreeBMT_3(t *testing.B)  { benchmarkSplitTreeBMT(1000, t) }
+func BenchmarkSplitTreeBMT_3h(t *testing.B) { benchmarkSplitTreeBMT(5000, t) }
+func BenchmarkSplitTreeBMT_4(t *testing.B)  { benchmarkSplitTreeBMT(10000, t) }
+func BenchmarkSplitTreeBMT_4h(t *testing.B) { benchmarkSplitTreeBMT(50000, t) }
+func BenchmarkSplitTreeBMT_5(t *testing.B)  { benchmarkSplitTreeBMT(100000, t) }
+func BenchmarkSplitTreeBMT_6(t *testing.B)  { benchmarkSplitTreeBMT(1000000, t) }
+func BenchmarkSplitTreeBMT_7(t *testing.B)  { benchmarkSplitTreeBMT(10000000, t) }
+
+// func BenchmarkSplitTreeBMT_8(t *testing.B)  { benchmarkSplitTreeBMT(100000000, t) }
+
+func BenchmarkSplitPyramidSHA3_2(t *testing.B)  { benchmarkSplitPyramidSHA3(100, t) }
+func BenchmarkSplitPyramidSHA3_2h(t *testing.B) { benchmarkSplitPyramidSHA3(500, t) }
+func BenchmarkSplitPyramidSHA3_3(t *testing.B)  { benchmarkSplitPyramidSHA3(1000, t) }
+func BenchmarkSplitPyramidSHA3_3h(t *testing.B) { benchmarkSplitPyramidSHA3(5000, t) }
+func BenchmarkSplitPyramidSHA3_4(t *testing.B)  { benchmarkSplitPyramidSHA3(10000, t) }
+func BenchmarkSplitPyramidSHA3_4h(t *testing.B) { benchmarkSplitPyramidSHA3(50000, t) }
+func BenchmarkSplitPyramidSHA3_5(t *testing.B)  { benchmarkSplitPyramidSHA3(100000, t) }
+func BenchmarkSplitPyramidSHA3_6(t *testing.B)  { benchmarkSplitPyramidSHA3(1000000, t) }
+func BenchmarkSplitPyramidSHA3_7(t *testing.B)  { benchmarkSplitPyramidSHA3(10000000, t) }
+
+// func BenchmarkSplitPyramidSHA3_8(t *testing.B)  { benchmarkSplitPyramidSHA3(100000000, t) }
+
+func BenchmarkSplitPyramidBMT_2(t *testing.B)  { benchmarkSplitPyramidBMT(100, t) }
+func BenchmarkSplitPyramidBMT_2h(t *testing.B) { benchmarkSplitPyramidBMT(500, t) }
+func BenchmarkSplitPyramidBMT_3(t *testing.B)  { benchmarkSplitPyramidBMT(1000, t) }
+func BenchmarkSplitPyramidBMT_3h(t *testing.B) { benchmarkSplitPyramidBMT(5000, t) }
+func BenchmarkSplitPyramidBMT_4(t *testing.B)  { benchmarkSplitPyramidBMT(10000, t) }
+func BenchmarkSplitPyramidBMT_4h(t *testing.B) { benchmarkSplitPyramidBMT(50000, t) }
+func BenchmarkSplitPyramidBMT_5(t *testing.B)  { benchmarkSplitPyramidBMT(100000, t) }
+func BenchmarkSplitPyramidBMT_6(t *testing.B)  { benchmarkSplitPyramidBMT(1000000, t) }
+func BenchmarkSplitPyramidBMT_7(t *testing.B)  { benchmarkSplitPyramidBMT(10000000, t) }
+
+// func BenchmarkSplitPyramidBMT_8(t *testing.B)  { benchmarkSplitPyramidBMT(100000000, t) }
+
+func BenchmarkSplitAppendPyramid_2(t *testing.B)  { benchmarkSplitAppendPyramid(100, 1000, t) }
+func BenchmarkSplitAppendPyramid_2h(t *testing.B) { benchmarkSplitAppendPyramid(500, 1000, t) }
+func BenchmarkSplitAppendPyramid_3(t *testing.B)  { benchmarkSplitAppendPyramid(1000, 1000, t) }
+func BenchmarkSplitAppendPyramid_4(t *testing.B)  { benchmarkSplitAppendPyramid(10000, 1000, t) }
+func BenchmarkSplitAppendPyramid_4h(t *testing.B) { benchmarkSplitAppendPyramid(50000, 1000, t) }
+func BenchmarkSplitAppendPyramid_5(t *testing.B)  { benchmarkSplitAppendPyramid(1000000, 1000, t) }
+func BenchmarkSplitAppendPyramid_6(t *testing.B)  { benchmarkSplitAppendPyramid(1000000, 1000, t) }
+func BenchmarkSplitAppendPyramid_7(t *testing.B)  { benchmarkSplitAppendPyramid(10000000, 1000, t) }
+
+// func BenchmarkAppendPyramid_8(t *testing.B)  { benchmarkAppendPyramid(100000000, 1000, t) }
+
+// go test -timeout 20m -cpu 4 -bench=./swarm/storage -run no
+// If you dont add the timeout argument above .. the benchmark will timeout and dump

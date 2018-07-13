@@ -29,11 +29,7 @@ import (
 	"gopkg.in/fatih/set.v0"
 )
 
-const (
-	notificationBufferSize = 10000 // max buffered notifications before codec is closed
-
-	MetadataApi = "rpc"
-)
+const MetadataApi = "rpc"
 
 // CodecOption specifies which type of messages this codec supports
 type CodecOption int
@@ -49,10 +45,9 @@ const (
 // NewServer will create a new server instance with no registered handlers.
 func NewServer() *Server {
 	server := &Server{
-		services:      make(serviceRegistry),
-		subscriptions: make(subscriptionRegistry),
-		codecs:        set.New(),
-		run:           1,
+		services: make(serviceRegistry),
+		codecs:   set.New(),
+		run:      1,
 	}
 
 	// register a default service which will provide meta information about the RPC service such as the services and
@@ -124,23 +119,13 @@ func (s *Server) RegisterName(name string, rcvr interface{}) error {
 	return nil
 }
 
-// hasOption returns true if option is included in options, otherwise false
-func hasOption(option CodecOption, options []CodecOption) bool {
-	for _, o := range options {
-		if option == o {
-			return true
-		}
-	}
-	return false
-}
-
 // serveRequest will reads requests from the codec, calls the RPC callback and
 // writes the response to the given codec.
 //
 // If singleShot is true it will process a single request, otherwise it will handle
 // requests until the codec returns an error when reading a request (in most cases
 // an EOF). It executes requests in parallel when singleShot is false.
-func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecOption) error {
+func (s *Server) serveRequest(ctx context.Context, codec ServerCodec, singleShot bool, options CodecOption) error {
 	var pend sync.WaitGroup
 
 	defer func() {
@@ -148,20 +133,19 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 			const size = 64 << 10
 			buf := make([]byte, size)
 			buf = buf[:runtime.Stack(buf, false)]
-			log.Error(fmt.Sprint(string(buf)))
+			log.Error(string(buf))
 		}
 		s.codecsMu.Lock()
 		s.codecs.Remove(codec)
 		s.codecsMu.Unlock()
-
-		return
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	//	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// if the codec supports notification include a notifier that callbacks can use
-	// to send notification to clients. It is thight to the codec/connection. If the
+	// to send notification to clients. It is tied to the codec/connection. If the
 	// connection is closed the notifier will stop and cancels all active subscriptions.
 	if options&OptionSubscriptions == OptionSubscriptions {
 		ctx = context.WithValue(ctx, notifierKey{}, newNotifier(codec))
@@ -232,21 +216,21 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 // stopped. In either case the codec is closed.
 func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
 	defer codec.Close()
-	s.serveRequest(codec, false, options)
+	s.serveRequest(context.Background(), codec, false, options)
 }
 
 // ServeSingleRequest reads and processes a single RPC request from the given codec. It will not
 // close the codec unless a non-recoverable error has occurred. Note, this method will return after
 // a single request has been processed!
-func (s *Server) ServeSingleRequest(codec ServerCodec, options CodecOption) {
-	s.serveRequest(codec, true, options)
+func (s *Server) ServeSingleRequest(ctx context.Context, codec ServerCodec, options CodecOption) {
+	s.serveRequest(ctx, codec, true, options)
 }
 
 // Stop will stop reading new requests, wait for stopPendingRequestTimeout to allow pending requests to finish,
 // close all codecs which will cancel pending requests/subscriptions.
 func (s *Server) Stop() {
 	if atomic.CompareAndSwapInt32(&s.run, 1, 0) {
-		log.Debug(fmt.Sprint("RPC Server shutdown initiatied"))
+		log.Debug("RPC Server shutdown initiatied")
 		s.codecsMu.Lock()
 		defer s.codecsMu.Unlock()
 		s.codecs.Each(func(c interface{}) bool {
@@ -329,7 +313,6 @@ func (s *Server) handle(ctx context.Context, codec ServerCodec, req *serverReque
 	if len(reply) == 0 {
 		return codec.CreateResponse(req.id, nil), nil
 	}
-
 	if req.callb.errPos >= 0 { // test if method returned an error
 		if !reply[req.callb.errPos].IsNil() {
 			e := reply[req.callb.errPos].Interface().(error)
@@ -438,7 +421,7 @@ func (s *Server) readRequest(codec ServerCodec) ([]*serverRequest, bool, Error) 
 					}
 				}
 			} else {
-				requests[i] = &serverRequest{id: r.id, err: &methodNotFoundError{r.method, r.method}}
+				requests[i] = &serverRequest{id: r.id, err: &methodNotFoundError{r.service, r.method}}
 			}
 			continue
 		}

@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
+	goruntime "runtime"
 	"runtime/pprof"
 	"time"
-
-	goruntime "runtime"
 
 	"github.com/ethereum/go-ethereum/cmd/evm/internal/compiler"
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -76,6 +76,7 @@ func runCmd(ctx *cli.Context) error {
 	logconfig := &vm.LogConfig{
 		DisableMemory: ctx.GlobalBool(DisableMemoryFlag.Name),
 		DisableStack:  ctx.GlobalBool(DisableStackFlag.Name),
+		Debug:         ctx.GlobalBool(DebugFlag.Name),
 	}
 
 	var (
@@ -83,7 +84,9 @@ func runCmd(ctx *cli.Context) error {
 		debugLogger *vm.StructLogger
 		statedb     *state.StateDB
 		chainConfig *params.ChainConfig
-		sender      = common.StringToAddress("sender")
+		sender      = common.BytesToAddress([]byte("sender"))
+		receiver    = common.BytesToAddress([]byte("receiver"))
+		blockNumber uint64
 	)
 	if ctx.GlobalBool(MachineFlag.Name) {
 		tracer = NewJSONLogger(logconfig, os.Stdout)
@@ -95,66 +98,74 @@ func runCmd(ctx *cli.Context) error {
 	}
 	if ctx.GlobalString(GenesisFlag.Name) != "" {
 		gen := readGenesis(ctx.GlobalString(GenesisFlag.Name))
-		_, statedb = gen.ToBlock()
+		db := ethdb.NewMemDatabase()
+		genesis := gen.ToBlock(db)
+		statedb, _ = state.New(genesis.Root(), state.NewDatabase(db))
 		chainConfig = gen.Config
+		blockNumber = gen.Number
 	} else {
-		db, _ := ethdb.NewMemDatabase()
-		statedb, _ = state.New(common.Hash{}, state.NewDatabase(db))
+		statedb, _ = state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
 	}
 	if ctx.GlobalString(SenderFlag.Name) != "" {
 		sender = common.HexToAddress(ctx.GlobalString(SenderFlag.Name))
 	}
-
 	statedb.CreateAccount(sender)
+
+	if ctx.GlobalString(ReceiverFlag.Name) != "" {
+		receiver = common.HexToAddress(ctx.GlobalString(ReceiverFlag.Name))
+	}
 
 	var (
 		code []byte
 		ret  []byte
 		err  error
 	)
-	if fn := ctx.Args().First(); len(fn) > 0 {
+	// The '--code' or '--codefile' flag overrides code in state
+	if ctx.GlobalString(CodeFileFlag.Name) != "" {
+		var hexcode []byte
+		var err error
+		// If - is specified, it means that code comes from stdin
+		if ctx.GlobalString(CodeFileFlag.Name) == "-" {
+			//Try reading from stdin
+			if hexcode, err = ioutil.ReadAll(os.Stdin); err != nil {
+				fmt.Printf("Could not load code from stdin: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Codefile with hex assembly
+			if hexcode, err = ioutil.ReadFile(ctx.GlobalString(CodeFileFlag.Name)); err != nil {
+				fmt.Printf("Could not load code from file: %v\n", err)
+				os.Exit(1)
+			}
+		}
+		code = common.Hex2Bytes(string(bytes.TrimRight(hexcode, "\n")))
+
+	} else if ctx.GlobalString(CodeFlag.Name) != "" {
+		code = common.Hex2Bytes(ctx.GlobalString(CodeFlag.Name))
+	} else if fn := ctx.Args().First(); len(fn) > 0 {
+		// EASM-file to compile
 		src, err := ioutil.ReadFile(fn)
 		if err != nil {
 			return err
 		}
-
 		bin, err := compiler.Compile(fn, src, false)
 		if err != nil {
 			return err
 		}
 		code = common.Hex2Bytes(bin)
-	} else if ctx.GlobalString(CodeFlag.Name) != "" {
-		code = common.Hex2Bytes(ctx.GlobalString(CodeFlag.Name))
-	} else {
-		var hexcode []byte
-		if ctx.GlobalString(CodeFileFlag.Name) != "" {
-			var err error
-			hexcode, err = ioutil.ReadFile(ctx.GlobalString(CodeFileFlag.Name))
-			if err != nil {
-				fmt.Printf("Could not load code from file: %v\n", err)
-				os.Exit(1)
-			}
-		} else {
-			var err error
-			hexcode, err = ioutil.ReadAll(os.Stdin)
-			if err != nil {
-				fmt.Printf("Could not load code from stdin: %v\n", err)
-				os.Exit(1)
-			}
-		}
-		code = common.Hex2Bytes(string(bytes.TrimRight(hexcode, "\n")))
 	}
+
 	initialGas := ctx.GlobalUint64(GasFlag.Name)
 	runtimeConfig := runtime.Config{
-		Origin:   sender,
-		State:    statedb,
-		GasLimit: initialGas,
-		GasPrice: utils.GlobalBig(ctx, PriceFlag.Name),
-		Value:    utils.GlobalBig(ctx, ValueFlag.Name),
+		Origin:      sender,
+		State:       statedb,
+		GasLimit:    initialGas,
+		GasPrice:    utils.GlobalBig(ctx, PriceFlag.Name),
+		Value:       utils.GlobalBig(ctx, ValueFlag.Name),
+		BlockNumber: new(big.Int).SetUint64(blockNumber),
 		EVMConfig: vm.Config{
-			Tracer:             tracer,
-			Debug:              ctx.GlobalBool(DebugFlag.Name) || ctx.GlobalBool(MachineFlag.Name),
-			DisableGasMetering: ctx.GlobalBool(DisableGasMeteringFlag.Name),
+			Tracer: tracer,
+			Debug:  ctx.GlobalBool(DebugFlag.Name) || ctx.GlobalBool(MachineFlag.Name),
 		},
 	}
 
@@ -180,9 +191,9 @@ func runCmd(ctx *cli.Context) error {
 		input := append(code, common.Hex2Bytes(ctx.GlobalString(InputFlag.Name))...)
 		ret, _, leftOverGas, err = runtime.Create(input, &runtimeConfig)
 	} else {
-		receiver := common.StringToAddress("receiver")
-		statedb.SetCode(receiver, code)
-
+		if len(code) > 0 {
+			statedb.SetCode(receiver, code)
+		}
 		ret, leftOverGas, err = runtime.Call(receiver, common.Hex2Bytes(ctx.GlobalString(InputFlag.Name)), &runtimeConfig)
 	}
 	execTime := time.Since(tstart)
@@ -226,14 +237,12 @@ Gas used:           %d
 
 `, execTime, mem.HeapObjects, mem.Alloc, mem.TotalAlloc, mem.NumGC, initialGas-leftOverGas)
 	}
-	if tracer != nil {
-		tracer.CaptureEnd(ret, initialGas-leftOverGas, execTime)
-	} else {
+	if tracer == nil {
 		fmt.Printf("0x%x\n", ret)
+		if err != nil {
+			fmt.Printf(" error: %v\n", err)
+		}
 	}
 
-	if err != nil {
-		fmt.Printf(" error: %v\n", err)
-	}
 	return nil
 }

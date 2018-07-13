@@ -53,7 +53,7 @@ var (
 	}
 	CodeFileFlag = cli.StringFlag{
 		Name:  "codefile",
-		Usage: "file containing EVM code",
+		Usage: "File containing EVM code. If '-' is specified, code is read from stdin ",
 	}
 	GasFlag = cli.Uint64Flag{
 		Name:  "gas",
@@ -86,10 +86,6 @@ var (
 		Name:  "create",
 		Usage: "indicates the action should be create rather than call",
 	}
-	DisableGasMeteringFlag = cli.BoolFlag{
-		Name:  "nogasmetering",
-		Usage: "disable gas metering",
-	}
 	GenesisFlag = cli.StringFlag{
 		Name:  "prestate",
 		Usage: "JSON file with prestate (genesis) config",
@@ -101,6 +97,10 @@ var (
 	SenderFlag = cli.StringFlag{
 		Name:  "sender",
 		Usage: "The transaction origin",
+	}
+	ReceiverFlag = cli.StringFlag{
+		Name:  "receiver",
+		Usage: "The transaction receiver (execution context)",
 	}
 	DisableMemoryFlag = cli.BoolFlag{
 		Name:  "nomemory",
@@ -124,13 +124,13 @@ func init() {
 		ValueFlag,
 		DumpFlag,
 		InputFlag,
-		DisableGasMeteringFlag,
 		MemProfileFlag,
 		CPUProfileFlag,
 		StatDumpFlag,
 		GenesisFlag,
 		MachineFlag,
 		SenderFlag,
+		ReceiverFlag,
 		DisableMemoryFlag,
 		DisableStackFlag,
 	}
@@ -138,6 +138,7 @@ func init() {
 		compileCommand,
 		disasmCommand,
 		runCommand,
+		stateTestCommand,
 	}
 }
 
