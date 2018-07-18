@@ -167,8 +167,8 @@ func NewHTTPServer(cors []string, vhosts []string, srv *Server) *http.Server {
 	handler = newVHostHandler(vhosts, handler)
 	return &http.Server{
 		Handler:      handler,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 }
