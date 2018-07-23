@@ -46,12 +46,13 @@ func (ota *OTAInstance) Download(info OTAInfo) (err error) {
 
 // Verify downloaded staging libraries.
 func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
-	libPath, err := getLibPath("staging")
+	libPath, err := getLibPath()
 	if err != nil {
 		return err
 	}
 
-	libFile, err := os.Open(filepath.Join(libPath, info.libName))
+	stagingLibPath := filepath.Join(libPath, "staging")
+	libFile, err := os.Open(filepath.Join(stagingLibPath, info.libName))
 	if err != nil {
 		return err
 	}
@@ -73,11 +74,11 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 func (ota *OTAInstance) Register(info OTAInfo) (err error) {
 	// Overwrite old libraries by libName.
 	ota.enableInfos[info.libName] = info
-	stagingLibPath, err := getLibPath("staging")
+	libPath, err := getLibPath()
 	if err != nil {
 		return err
 	}
-	libPath, err := getLibPath("lib")
+	stagingLibPath := filepath.Join(libPath, "staging")
 	if err != nil {
 		return err
 	}
@@ -90,11 +91,11 @@ func (ota *OTAInstance) Register(info OTAInfo) (err error) {
 
 // Remove unused libraries from lib and staging folder
 func (ota *OTAInstance) Destroy(info OTAInfo) (err error) {
-	stagingLibPath, err := getLibPath("staging")
+	libPath, err := getLibPath()
 	if err != nil {
 		return err
 	}
-	libPath, err := getLibPath("lib")
+	stagingLibPath := filepath.Join(libPath, "staging")
 	if err != nil {
 		return err
 	}
@@ -121,37 +122,34 @@ func (ota *OTAInstance) Destroy(info OTAInfo) (err error) {
 }
 
 // Get libPath from default data path or ENI_LIBRARY_PATH
-func getLibPath(phase string) (libPath string, err error) {
-	if phase == "lib" || phase == "staging" {
-		libPath = filepath.Join(node.DefaultDataDir(), "eni", phase)
-		if val, ok := os.LookupEnv("ENI_LIBRARY_PATH"); ok {
-			libPath = filepath.Join(val, "..", phase)
-		}
-
-		// Check if the ENI_LIBRARY_PATH is existed.
-		fileinfo, err := os.Stat(libPath)
-		if err != nil {
-			return "", err
-		}
-		if !fileinfo.Mode().IsDir() {
-			return "", errors.New("can't find dynamic library path: " + libPath)
-		}
-		return libPath, nil
-	} else {
-		return "", errors.New("Unknown phase")
+func getLibPath() (libPath string, err error) {
+	libPath = filepath.Join(node.DefaultDataDir(), "eni", "lib")
+	if val, ok := os.LookupEnv("ENI_LIBRARY_PATH"); ok {
+		libPath = val
 	}
+
+	// Check if the ENI_LIBRARY_PATH is existed.
+	fileinfo, err := os.Stat(libPath)
+	if err != nil {
+		return "", err
+	}
+	if !fileinfo.Mode().IsDir() {
+		return "", errors.New("can't find dynamic library path: " + libPath)
+	}
+	return libPath, nil
 }
 
 // Download the library from given url. The library will
 // be saved in ENI_LIBRARY_PATH/../staging named OTAInfo.libName.
 func downloadFromUrl(url string, libName string) (err error) {
-	libPath, err := getLibPath("staging")
+	libPath, err := getLibPath()
+	stagingLibPath := filepath.Join(libPath, "staging")
 	if err != nil {
 		return err
 	}
 
 	// If file is existed, we don't need to download it again.
-	fileName := filepath.Join(libPath, libName)
+	fileName := filepath.Join(stagingLibPath, libName)
 	if _, err := os.Stat(fileName); err == nil {
 		return nil
 	}
