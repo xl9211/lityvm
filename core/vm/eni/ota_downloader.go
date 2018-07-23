@@ -13,13 +13,10 @@ import (
 )
 
 type OTAInfo struct {
-	libName           string
-	version           string
-	url               string // URL to retrieve the library file
-	checksum          string // SHA512 checksum to check the health of the library
-	deployedTimestamp string // Timestamp to all nodes to download the library after proposal is approved
-	reason            string
-	expiredTimestamp  string // Remain timestamp before expire
+	libName  string
+	version  string
+	url      string // URL to retrieve the library file
+	checksum string // SHA512 checksum to check the health of the library
 }
 
 type OTAInstance struct {
