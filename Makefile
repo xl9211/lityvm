@@ -10,7 +10,8 @@
 
 GOBIN = $(shell pwd)/build/bin
 GO ?= latest
-CGO_LDFLAGS = -L$(HOME)/.travis/eni/lib -Wl,-rpath,$(HOME)/.travis/eni/lib
+ENI_LIB?=$(HOME)/.travis/eni/lib
+CGO_LDFLAGS = -L$(ENI_LIB) -Wl,-rpath,$(ENI_LIB)
 CGO_LDFLAGS_ALLOW = "-I.*"
 
 geth:
