@@ -65,6 +65,7 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 
 	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	if checksum != info.checksum {
+		os.Remove(libFile)
 		return errors.New("Library " + info.libName + " checksum doesn't match")
 	}
 	return nil
