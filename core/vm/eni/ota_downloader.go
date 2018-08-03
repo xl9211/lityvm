@@ -155,21 +155,30 @@ func downloadFromUrl(url string, libName string) (err error) {
 	}
 
 	// Create the output file.
+
+	// If the output file is broken, remove it.
+	defer func() {
+		if rec := recover(); rec != nil {
+			os.Remove(fileName)
+			return rec
+		}
+	}()
+
 	output, err := os.Create(fileName)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer output.Close()
 
 	response, err := http.Get(url)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer response.Body.Close()
 
 	_, err = io.Copy(output, response.Body)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	return nil
