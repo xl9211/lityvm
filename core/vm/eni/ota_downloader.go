@@ -25,12 +25,23 @@ type OTAInfo struct {
 type OTAInstance struct {
 	availableInfos map[string]OTAInfo
 	enableInfos    map[string]OTAInfo
+	libPath        string
+	stagingLibPath string
+	retiredLibPath string
 }
 
 func NewOTAInstance() *OTAInstance {
+	libPath, err := getLibPath()
+	if err != nil {
+		return nil
+	}
+
 	ota := OTAInstance{
 		availableInfos: make(map[string]OTAInfo),
 		enableInfos:    make(map[string]OTAInfo),
+		libPath:        libPath,
+		stagingLibPath: filepath.Join(libPath, "staging"),
+		retiredLibPath: filepath.Join(libPath, "retired"),
 	}
 	return &ota
 }
@@ -126,7 +137,7 @@ func (ota *OTAInstance) Download(info OTAInfo) (err error) {
 		ota.availableInfos[hashKey] = info
 	}
 
-	err = downloadFromUrl(info.url, generateFileName(info))
+	err = ota.downloadFromUrl(info)
 	if err != nil {
 		return err
 	}
@@ -135,13 +146,9 @@ func (ota *OTAInstance) Download(info OTAInfo) (err error) {
 
 // Verify downloaded staging libraries.
 func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
-	libPath, err := getLibPath()
-	if err != nil {
-		return err
-	}
-
-	stagingLibPath := filepath.Join(libPath, "staging")
-	libFile, err := os.Open(filepath.Join(stagingLibPath, generateFileName(info)))
+	libFile, err := os.Open(filepath.Join(
+		ota.stagingLibPath,
+		generateFileName(info)))
 	if err != nil {
 		return err
 	}
@@ -154,7 +161,9 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 
 	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	if checksum != info.checksum {
-		os.Remove(filepath.Join(stagingLibPath, generateFileName(info)))
+		os.Remove(filepath.Join(
+			ota.stagingLibPath,
+			generateFileName(info)))
 		return errors.New("Library " + info.libName + " checksum doesn't match")
 	}
 	return nil
@@ -164,17 +173,9 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 func (ota *OTAInstance) Register(info OTAInfo) (err error) {
 	// Overwrite old libraries by libName.
 	ota.enableInfos[info.libName] = info
-	libPath, err := getLibPath()
-	if err != nil {
-		return err
-	}
-	stagingLibPath := filepath.Join(libPath, "staging")
-	if err != nil {
-		return err
-	}
 	err = os.Rename(
-		filepath.Join(stagingLibPath, generateFileName(info)),
-		filepath.Join(libPath, generateFileName(info)))
+		filepath.Join(ota.stagingLibPath, generateFileName(info)),
+		filepath.Join(ota.libPath, generateFileName(info)))
 	if err != nil {
 		return err
 	}
@@ -183,17 +184,8 @@ func (ota *OTAInstance) Register(info OTAInfo) (err error) {
 
 // Remove unused libraries from lib and staging folder
 func (ota *OTAInstance) Destroy(info OTAInfo) (err error) {
-	libPath, err := getLibPath()
-	if err != nil {
-		return err
-	}
-	stagingLibPath := filepath.Join(libPath, "staging")
-	if err != nil {
-		return err
-	}
-
 	// Check lib folder first.
-	fileName := filepath.Join(libPath, generateFileName(info))
+	fileName := filepath.Join(ota.libPath, generateFileName(info))
 	if _, err := os.Stat(fileName); err == nil {
 		err = os.Remove(fileName)
 		if err != nil {
@@ -202,7 +194,7 @@ func (ota *OTAInstance) Destroy(info OTAInfo) (err error) {
 	}
 
 	// Check staging folder first.
-	fileName = filepath.Join(stagingLibPath, generateFileName(info))
+	fileName = filepath.Join(ota.stagingLibPath, generateFileName(info))
 	if _, err := os.Stat(fileName); err == nil {
 		err = os.Remove(fileName)
 		if err != nil {
@@ -233,15 +225,9 @@ func getLibPath() (libPath string, err error) {
 
 // Download the library from given url. The library will
 // be saved in ENI_LIBRARY_PATH/staging named OTAInfo.libName.
-func downloadFromUrl(url string, libName string) (err error) {
-	libPath, err := getLibPath()
-	stagingLibPath := filepath.Join(libPath, "staging")
-	if err != nil {
-		return err
-	}
-
+func (ota *OTAInstance) downloadFromUrl(info OTAInfo) (err error) {
 	// If file is existed, we don't need to download it again.
-	fileName := filepath.Join(stagingLibPath, libName)
+	fileName := filepath.Join(ota.stagingLibPath, generateFileName(info))
 	if _, err := os.Stat(fileName); err == nil {
 		return nil
 	}
@@ -262,7 +248,7 @@ func downloadFromUrl(url string, libName string) (err error) {
 	}
 	defer output.Close()
 
-	response, err := http.Get(url)
+	response, err := http.Get(info.url)
 	if err != nil {
 		panic(err)
 	}
