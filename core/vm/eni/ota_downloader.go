@@ -16,10 +16,10 @@ import (
 )
 
 type OTAInfo struct {
-	libName  string
-	version  string // The format of version should be vX.Y.Z where X, Y, Z are all integers. E.g. v1.0.0, v3.2.0
-	url      string // URL to retrieve the library file
-	checksum string // SHA512 checksum to check the health of the library
+	LibName  string
+	Version  string // The format of version should be vX.Y.Z where X, Y, Z are all integers. E.g. v1.0.0, v3.2.0
+	Url      string // URL to retrieve the library file
+	Checksum string // SHA512 checksum to check the health of the library
 }
 
 type OTAInstance struct {
@@ -37,7 +37,7 @@ func NewOTAInstance() *OTAInstance {
 
 // Use OTAInfo to generate real path name of a single library
 func generateFileName(info OTAInfo) string {
-	fileName := info.libName + "_" + info.version + ".so"
+	fileName := info.LibName + "_" + info.Version + ".so"
 	return fileName
 }
 
@@ -45,6 +45,16 @@ type Version struct {
 	major int
 	minor int
 	patch int
+}
+
+func init() {
+	libPath, err := getLibPath()
+	if err != nil {
+		return
+	}
+
+	os.Mkdir(filepath.Join(libPath, "staging"), 0644)
+	os.Mkdir(filepath.Join(libPath, "retired"), 0644)
 }
 
 func NewVersion() *Version {
@@ -101,12 +111,12 @@ func (v *Version) Compare(a Version) int {
 // Check a given OTAInfo is valid to upgrade system setting
 func (ota *OTAInstance) IsValidUpgrade(info OTAInfo) (bool, error) {
 	currentVersion := NewVersion()
-	err := currentVersion.BuildFromString(ota.enableInfos[info.libName].version)
+	err := currentVersion.BuildFromString(ota.enableInfos[info.LibName].Version)
 	if err != nil {
 		return false, err
 	}
 	nextVersion := NewVersion()
-	err = nextVersion.BuildFromString(info.version)
+	err = nextVersion.BuildFromString(info.Version)
 	if err != nil {
 		return false, err
 	}
@@ -120,13 +130,13 @@ func (ota *OTAInstance) IsValidUpgrade(info OTAInfo) (bool, error) {
 
 // Download the library to staging folder
 func (ota *OTAInstance) Download(info OTAInfo) (err error) {
-	hashKey := info.libName + info.version
+	hashKey := info.LibName + info.Version
 	// Cache OTAInfo to available list.
 	if _, exist := ota.availableInfos[hashKey]; !exist {
 		ota.availableInfos[hashKey] = info
 	}
 
-	err = downloadFromUrl(info.url, generateFileName(info))
+	err = downloadFromUrl(info.Url, generateFileName(info))
 	if err != nil {
 		return err
 	}
@@ -153,9 +163,9 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 	}
 
 	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	if checksum != info.checksum {
+	if checksum != info.Checksum {
 		os.Remove(filepath.Join(stagingLibPath, generateFileName(info)))
-		return errors.New("Library " + info.libName + " checksum doesn't match")
+		return errors.New("Library " + info.LibName + " checksum doesn't match")
 	}
 	return nil
 }
@@ -163,7 +173,7 @@ func (ota *OTAInstance) Verify(info OTAInfo) (err error) {
 // Register staging libraries to lib.
 func (ota *OTAInstance) Register(info OTAInfo) (err error) {
 	// Overwrite old libraries by libName.
-	ota.enableInfos[info.libName] = info
+	ota.enableInfos[info.LibName] = info
 	libPath, err := getLibPath()
 	if err != nil {
 		return err
@@ -232,7 +242,7 @@ func getLibPath() (libPath string, err error) {
 }
 
 // Download the library from given url. The library will
-// be saved in ENI_LIBRARY_PATH/staging named OTAInfo.libName.
+// be saved in ENI_LIBRARY_PATH/staging named OTAInfo.LibName.
 func downloadFromUrl(url string, libName string) (err error) {
 	libPath, err := getLibPath()
 	stagingLibPath := filepath.Join(libPath, "staging")
