@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 	"strings"
@@ -286,6 +287,8 @@ func (evm *EVMC) Run(contract *Contract, input []byte) (ret []byte, err error) {
 
 	if err == evmc.Revert {
 		err = errExecutionReverted
+	} else if evmcError, ok := err.(evmc.Error); ok && evmcError.IsInternalError() {
+		panic(fmt.Sprintf("EVMC VM internal error: %s", evmcError.Error()))
 	}
 
 	return output, err
