@@ -17,9 +17,9 @@ import (
 
 type OTAInfo struct {
 	LibName  string
-	Version  string // The format of version should be vX.Y.Z where X, Y, Z are all integers. E.g. v1.0.0, v3.2.0
+	Version  string   // The format of version should be vX.Y.Z where X, Y, Z are all integers. E.g. v1.0.0, v3.2.0
 	Url      []string // URL to retrieve the library file
-	Checksum string // SHA512 checksum to check the health of the library
+	Checksum string   // SHA512 checksum to check the health of the library
 }
 
 type OTAInstance struct {
@@ -293,7 +293,6 @@ func (ota *OTAInstance) downloadFromUrl(fileName, url string) (err error) {
 
 	return nil
 }
-
 
 // Load existed libraries from ENI library path.
 func (ota *OTAInstance) loadExistedLib() {
