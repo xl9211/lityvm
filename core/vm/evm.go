@@ -129,6 +129,8 @@ type EVM struct {
 	abort int32
 	// ethereum native interface handler
 	eni *eni.ENI
+	// umbrella is a hendler to communacate with Travis database
+	umbrella *umbrella.Umbrella
 	// callGasTemp holds the gas available for the current call. This is needed because the
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
@@ -146,6 +148,7 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 		chainRules:   chainConfig.Rules(ctx.BlockNumber),
 		interpreters: make([]Interpreter, 1),
 		eni:          eni.NewENI(),
+		umbrella:     ctx.Umbrella,
 	}
 
 	if len(os.Getenv("EVMC_PATH")) != 0 {
