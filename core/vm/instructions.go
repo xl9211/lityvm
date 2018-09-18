@@ -37,6 +37,7 @@ var (
 	errReturnDataOutOfBounds = errors.New("evm: return data out of bounds")
 	errExecutionReverted     = errors.New("evm: execution reverted")
 	errMaxCodeSizeExceeded   = errors.New("evm: max code size exceeded")
+	errENIExecutionError     = errors.New("evm: eni execution error")
 )
 
 func opAdd(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
@@ -806,6 +807,9 @@ func opENI(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *
 	retText, err := interpreter.evm.eni.ExecuteENI()
 	if err != nil {
 		return nil, err
+	}
+	if retText == "" {
+		return nil, errENIExecutionError
 	}
 
 	// Parse returned data
