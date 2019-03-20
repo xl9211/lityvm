@@ -865,7 +865,15 @@ func opENI(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *
 	retDataOffset := dataOffset + 32 + argsDataLength
 	retDataLength := math.PaddedBigBytes(big.NewInt(int64(len(retData))), 32)
 
-	memory.Resize(uint64(retDataOffset + 32 + int64(len(retData))))
+	newMemorySize := uint64(retDataOffset + 32 + int64(len(retData)))
+	newMemoryGas, err := memoryGasCost(memory, newMemorySize)
+	if err != nil {
+		return nil, err
+	}
+	if !contract.UseGas(newMemoryGas) {
+		return nil, ErrOutOfGas
+	}
+	memory.Resize(newMemorySize)
 	memory.Set(uint64(retDataOffset), 32, retDataLength)
 	memory.Set(uint64(retDataOffset+32), uint64(len(retData)), retData)
 	nextFreeMemoryOffset := uint64(uint64(retDataOffset) + 32 + uint64(len(retData)))
