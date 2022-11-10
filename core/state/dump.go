@@ -71,6 +71,17 @@ func (self *StateDB) RawDump() Dump {
 	return dump
 }
 
+func (self *StateDB) AddrDump() []string {
+	addresses := make([]string, 0)
+
+	it := trie.NewIterator(self.trie.NodeIterator(nil))
+	for it.Next() {
+		addr := self.trie.GetKey(it.Key)
+		addresses = append(addresses, common.Bytes2Hex(addr))
+	}
+	return addresses
+}
+
 func (self *StateDB) Dump() []byte {
 	json, err := json.MarshalIndent(self.RawDump(), "", "    ")
 	if err != nil {
